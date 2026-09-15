@@ -12,8 +12,8 @@ set -eu
 #   3) Use ldid -M -S<entitlements> for signing (official method)
 #   4) Entitlements must include roothide 4 basic permissions + healthkit private permission
 
-# Version: v3.0.0 (步数生成逻辑重构：显示=真实步数+虚拟步数，替换式；移除"有真实步数就跳过虚拟样本"的旧分支)
-VER=3.0.0
+# Version: v3.0.1 (生成后自动杀微信刷新步数；修正删除日志)
+VER=3.0.1
 echo "Version: $VER"
 PKG="com.sykes.ucs"
 OUT="${PKG}_${VER}_iphoneos-arm64e.deb"

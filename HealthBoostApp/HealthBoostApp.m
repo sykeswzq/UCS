@@ -927,7 +927,8 @@ static NSString * const HBNotifRequestedKey = @"hb_notif_requested";
             BOOL isMine = (myBid != nil && bid != nil && [bid isEqualToString:myBid]);
             if (isDevice || isHealthApp || isMine) [deviceSamples addObject:s];
         }
-        HBLog(@"[UCS] samples to delete: %lu (of %lu)", (unsigned long)deviceSamples.count, (unsigned long)samples.count);
+        HBLog(@"[UCS] deletable old synthetic samples: %lu (of %lu total today)",
+              (unsigned long)oldSynthetic.count, (unsigned long)samples.count);
 
         __weak typeof(self) weakSelf = self;
         // 修复(V2.0.2)：绝不删除真实设备/健康样本，仅清掉本 App 之前写的合成样本
@@ -1181,10 +1182,34 @@ static const NSTimeInterval kBatchIntervalSeconds = 60;  // 每批时间窗口 6
     }];
 }
 
+// 生成完成后杀掉微信进程：tweak 注入在微信进程内，微信不主动重读步数时
+// 光写 HealthKit 不会让微信运动立刻刷新。杀掉后下次打开微信会重新注入、
+// 重新读 CMPedometer/HealthKit，立即显示 真实+虚拟。
+static void HBKillWeChat(void) {
+    NSArray *killallPaths = @[
+        @"/var/jb/bin/killall",
+        @"/var/jb/usr/bin/killall",
+        @"/usr/bin/killall",
+        @"/bin/killall"
+    ];
+    for (NSString *p in killallPaths) {
+        if (access(p.UTF8String, X_OK) == 0) {
+            char cmd[300];
+            snprintf(cmd, sizeof(cmd), "%s -9 WeChat 2>/dev/null; %s -9 UGGD 2>/dev/null",
+                     p.UTF8String, p.UTF8String);
+            system(cmd);
+            HBLog(@"[UCS] 已执行 %s -9 WeChat UGGD（微信下次打开即刷新步数）", p.UTF8String);
+            return;
+        }
+    }
+    HBLog(@"[UCS] 未找到 killall，未能自动重启微信（请手动杀掉微信重开）");
+}
+
 - (void)finishSuccess:(HKSourceRevision *)deviceRev {
     self.busy = NO;
     [HBTodayString() writeToFile:HBLastGenPath() atomically:YES encoding:NSUTF8StringEncoding error:nil];
-    [self updateStatus:@"运动数据已生成"];
+    [self updateStatus:@"运动数据已生成，正在重启微信以刷新步数…"];
+    HBKillWeChat();
 }
 
 - (void)finishWithError:(NSError *)error busy:(BOOL)busyFlag {
