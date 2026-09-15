@@ -1184,31 +1184,37 @@ static const NSTimeInterval kBatchIntervalSeconds = 60;  // 每批时间窗口 6
 // 生成完成后杀掉微信进程：tweak 注入在微信进程内，微信不主动重读步数时
 // 光写 HealthKit 不会让微信运动立刻刷新。杀掉后下次打开微信会重新注入、
 // 重新读 CMPedometer/HealthKit，立即显示 真实+虚拟。
-// iOS SDK 禁用 system()，改用 posix_spawn 直接执行 killall。
-#include <spawn.h>
-extern char **environ;
-static void HBExecKillall(NSString *path) {
-    const char *p = path.UTF8String;
-    if (access(p, X_OK) != 0) return;
-    pid_t pid = 0;
-    const char *argvW[] = { p, "-9", "WeChat", NULL };
-    const char *argvU[] = { p, "-9", "UGGD", NULL };
-    posix_spawn(&pid, p, NULL, NULL, (char *const *)argvW, environ);
-    if (pid > 0) waitpid(pid, NULL, WNOHANG);
-    posix_spawn(&pid, p, NULL, NULL, (char *const *)argvU, environ);
-    if (pid > 0) waitpid(pid, NULL, WNOHANG);
-    HBLog(@"[UCS] 已执行 %s -9 WeChat UGGD", p);
+// iOS SDK 禁用 system()，roothide 下 killall 路径也不固定。
+// 直接用 sysctl 枚举进程表 + kill(PID, SIGKILL)，不依赖任何外部二进制。
+#include <sys/sysctl.h>
+#include <signal.h>
+static void HBKillProcessNamed(const char *name) {
+    int mib[4] = { CTL_KERN, KERN_PROC, KERN_PROC_ALL, 0 };
+    size_t needed = 0;
+    if (sysctl(mib, 4, NULL, &needed, NULL, 0) < 0) return;
+    struct kinfo_proc *procList = malloc(needed);
+    if (!procList) return;
+    if (sysctl(mib, 4, procList, &needed, NULL, 0) < 0) { free(procList); return; }
+    int count = (int)(needed / sizeof(struct kinfo_proc));
+    int killed = 0;
+    for (int i = 0; i < count; i++) {
+        char pcomm[256] = {0};
+        strncpy(pcomm, procList[i].kp_proc.p_comm, sizeof(pcomm) - 1);
+        if (strstr(pcomm, name) != NULL) {
+            pid_t pid = procList[i].kp_proc.p_pid;
+            if (pid > 1) {
+                kill(pid, SIGKILL);
+                HBLog(@"[UCS] killed %s (pid=%d)", pcomm, (int)pid);
+                killed++;
+            }
+        }
+    }
+    free(procList);
+    if (killed == 0) HBLog(@"[UCS] 未找到进程 %s（微信可能未在运行）", name);
 }
 static void HBKillWeChat(void) {
-    for (NSString *p in @[
-        @"/var/jb/bin/killall",
-        @"/var/jb/usr/bin/killall",
-        @"/usr/bin/killall",
-        @"/bin/killall"
-    ]) {
-        if (access(p.UTF8String, X_OK) == 0) { HBExecKillall(p); return; }
-    }
-    HBLog(@"[UCS] 未找到 killall，未能自动重启微信（请手动杀掉微信重开）");
+    HBKillProcessNamed("WeChat");
+    HBKillProcessNamed("UGGD");
 }
 
 - (void)finishSuccess:(HKSourceRevision *)deviceRev {
