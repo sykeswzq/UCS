@@ -12,8 +12,8 @@ set -eu
 #   3) Use ldid -M -S<entitlements> for signing (official method)
 #   4) Entitlements must include roothide 4 basic permissions + healthkit private permission
 
-# Version: v3.0.2 (改用 sysctl+kill 直接杀微信进程，不依赖 killall 路径)
-VER=3.0.2
+# Version: v3.0.3 (合成样本改铺凌晨时段，避开HealthKit时间重叠去重导致的步数丢失)
+VER=3.0.3
 echo "Version: $VER"
 PKG="com.sykes.ucs"
 OUT="${PKG}_${VER}_iphoneos-arm64e.deb"
