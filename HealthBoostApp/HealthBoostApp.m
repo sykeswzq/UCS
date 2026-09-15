@@ -834,6 +834,15 @@ static NSString * const HBNotifRequestedKey = @"hb_notif_requested";
     HKQuantityType *distType   = [HKQuantityType quantityTypeForIdentifier:HKQuantityTypeIdentifierDistanceWalkingRunning];
     HKQuantityType *flightType = [HKQuantityType quantityTypeForIdentifier:HKQuantityTypeIdentifierFlightsClimbed];
     NSSet *shareTypes = [NSSet setWithObjects:stepType, distType, flightType, nil];
+    if (self.isCLI) {
+        // CLI mode: already authorized from UI use, skip request dialog
+        [self fetchDeviceSourceRevision:^(HKSourceRevision *devRev) {
+            dispatch_async(dispatch_get_main_queue(), ^{
+                [self writeSamplesSequentially:devRev stepCount:steps distanceM:distanceMeters flights:flights];
+            });
+        }];
+        return;
+    }
     [self.healthStore requestAuthorizationToShareTypes:shareTypes readTypes:nil completion:^(BOOL success, NSError *error) {
         dispatch_async(dispatch_get_main_queue(), ^{
             if (!success) {
