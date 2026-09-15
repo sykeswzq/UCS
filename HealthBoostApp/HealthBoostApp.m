@@ -444,6 +444,7 @@ static HKQuantitySample *HBMakeDeviceSample(HKQuantityType *type,
 @property (assign, nonatomic) BOOL enabled;
 @property (assign, nonatomic) BOOL scheduleOn;
 @property (assign, nonatomic) BOOL isCLI;
+@property (assign, nonatomic) BOOL autoCatchUp;
 @property (assign, nonatomic) NSInteger schedHour;
 @property (assign, nonatomic) NSInteger schedMinute;
 @property (assign, nonatomic) BOOL busy;
@@ -510,6 +511,7 @@ static NSString *HBTodayString(void) {
     [self loadSettings];   // 强制从磁盘刷新，避免用内存里的旧步数值
     HBLog(@"[UCS] 错过定时通知，自动补生成今日数据 (设定 %02ld:%02ld, 当前 %02ld:%02ld)",
           (long)self.schedHour, (long)self.schedMinute, (long)now.hour, (long)now.minute);
+    self.autoCatchUp = YES;
     [self updateStatus:@"已自动补生成今日数据…"];
     [self generateNow];
 }
@@ -1282,7 +1284,7 @@ static void HBLaunchWeChat(void) {
     HBKillWeChat();
     sleep(2);  // 等杀进程落地
     HBLaunchWeChat();
-    if (self.isCLI) { NSLog(@"[UCS] CLI done, exit"); exit(0); }
+    if (self.isCLI || self.autoCatchUp) { NSLog(@"[UCS] done, exit"); exit(0); }
 }
 
 - (void)finishWithError:(NSError *)error busy:(BOOL)busyFlag {
