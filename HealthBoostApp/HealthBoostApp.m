@@ -1,4 +1,4 @@
-﻿// HealthBoost - iOS App that writes steps / distance / flights to Apple Health as device source
+// HealthBoost - iOS App that writes steps / distance / flights to Apple Health as device source
 // 使用 com.apple.private.healthkit.source_override + authorization_bypass 私有权限
 // 让写出的 step count 来源伪装成 iPhone 设备源，从而被微信运动等应用读取
 #import <UIKit/UIKit.h>
@@ -1065,14 +1065,14 @@ static const NSTimeInterval kBatchIntervalSeconds = 60;  // 每批时间窗口 6
         }
         HBLog(@"[UCS] writeVirtual: found %lu synthetic, %lu occupied minutes",
               (unsigned long)syntheticSamples.count, (unsigned long)occupiedMinute.count);
+        if (virtualSteps <= 0) {
+            HBLog(@"[UCS] 虚拟步数=0，无样本需清理");
+            dispatch_async(dispatch_get_main_queue(), ^{
                 __strong typeof(weakSelf) strongSelf2 = weakSelf;
                 if (strongSelf2) [strongSelf2 finishWithError:nil busy:YES];
             });
             return;
         }
-
-        // 在后台队列删除旧样本并写入新样本（纯异步递归，不阻塞任何队列）
-        __block NSUInteger deleteIdx = 0;
         __block NSUInteger batchIdx = 0;
         __block long remaining = virtualSteps;
         __block NSError *finalError = nil;
