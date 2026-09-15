@@ -1086,7 +1086,11 @@ static const NSTimeInterval kBatchIntervalSeconds = 60;  // 每批时间窗口 6
 
             long batch = (remaining < kSyntheticBatchSize) ? remaining : kSyntheticBatchSize;
             HKQuantity *qty = [HKQuantity quantityWithUnit:[HKUnit countUnit] doubleValue:(double)batch];
-            NSDate *batchStart = [now dateByAddingTimeInterval:-((NSTimeInterval)batchIdx * kBatchIntervalSeconds)];
+            // UCS v3.0.3：把合成样本铺在今天凌晨(startOfDay 起)的时段，而不是"现在往前推"。
+            // 原因：HKStatisticsQuery 对时间重叠的样本会去重（按来源优先级只算一份），
+            // 之前铺在"最近14分钟"会和白天真实走动样本重叠，导致写7000只算进去一部分。
+            // 凌晨时段没有真实样本，合成样本不会被去重，总数才对。
+            NSDate *batchStart = [startOfDay dateByAddingTimeInterval:((NSTimeInterval)batchIdx * kBatchIntervalSeconds)];
             NSDate *batchEnd = [batchStart dateByAddingTimeInterval:kBatchIntervalSeconds];
 
             HKQuantitySample *sample = [HKQuantitySample quantitySampleWithType:stepType
