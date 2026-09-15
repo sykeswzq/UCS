@@ -1073,10 +1073,10 @@ static const NSTimeInterval kBatchIntervalSeconds = 60;  // 每批时间窗口 6
             });
             return;
         }
+        __block NSUInteger deleteIdx = 0;
         __block NSUInteger batchIdx = 0;
         __block long remaining = virtualSteps;
         __block NSError *finalError = nil;
-
         __block void (^processNextBatch)(void) = ^{
             __strong typeof(weakSelf) strongSelf2 = weakSelf;
             if (!strongSelf2) return;
