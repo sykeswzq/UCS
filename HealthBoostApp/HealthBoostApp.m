@@ -501,9 +501,9 @@ static NSString *HBTodayString(void) {
 }
 
 - (void)checkAndCatchUpGeneration {
-    HBLog(@"[UCS] checkAndCatchUp: scheduleOn=%d enabled=%d busy=%d", self.scheduleOn, self.enabled, self.busy);
-    if (!self.scheduleOn || !self.enabled || self.busy) {
-        HBLog(@"[UCS] checkAndCatchUp: skip (scheduleOn/enabled/busy)");
+    HBLog(@"[UCS] checkAndCatchUp: scheduleOn=%d busy=%d", self.scheduleOn, self.busy);
+    if (!self.scheduleOn || self.busy) {
+        HBLog(@"[UCS] checkAndCatchUp: skip (scheduleOn/busy)");
         return;
     }
     NSString *last = [NSString stringWithContentsOfFile:HBLastGenPath() encoding:NSUTF8StringEncoding error:nil];
