@@ -501,13 +501,25 @@ static NSString *HBTodayString(void) {
 }
 
 - (void)checkAndCatchUpGeneration {
-    if (!self.scheduleOn || !self.enabled || self.busy) return;
+    HBLog(@"[UCS] checkAndCatchUp: scheduleOn=%d enabled=%d busy=%d", self.scheduleOn, self.enabled, self.busy);
+    if (!self.scheduleOn || !self.enabled || self.busy) {
+        HBLog(@"[UCS] checkAndCatchUp: skip (scheduleOn/enabled/busy)");
+        return;
+    }
     NSString *last = [NSString stringWithContentsOfFile:HBLastGenPath() encoding:NSUTF8StringEncoding error:nil];
     last = [last stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
-    if ([last isEqualToString:HBTodayString()]) return;   // 今天已生成过
+    HBLog(@"[UCS] checkAndCatchUp: last=%@ today=%@", last, HBTodayString());
+    if ([last isEqualToString:HBTodayString()]) {
+        HBLog(@"[UCS] checkAndCatchUp: already generated today");
+        return;
+    }
     NSCalendar *cal = [NSCalendar currentCalendar];
     NSDateComponents *now = [cal components:NSCalendarUnitHour|NSCalendarUnitMinute fromDate:[NSDate date]];
-    if (now.hour < self.schedHour || (now.hour == self.schedHour && now.minute < self.schedMinute)) return;   // 还没到设定时间
+    HBLog(@"[UCS] checkAndCatchUp: now=%02ld:%02ld sched=%02ld:%02ld", (long)now.hour, (long)now.minute, (long)self.schedHour, (long)self.schedMinute);
+    if (now.hour < self.schedHour || (now.hour == self.schedHour && now.minute < self.schedMinute)) {
+        HBLog(@"[UCS] checkAndCatchUp: not time yet");
+        return;
+    }
     [self loadSettings];   // 强制从磁盘刷新，避免用内存里的旧步数值
     HBLog(@"[UCS] 错过定时通知，自动补生成今日数据 (设定 %02ld:%02ld, 当前 %02ld:%02ld)",
           (long)self.schedHour, (long)self.schedMinute, (long)now.hour, (long)now.minute);
