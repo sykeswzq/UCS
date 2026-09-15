@@ -1,4 +1,4 @@
-// HealthBoost - iOS App that writes steps / distance / flights to Apple Health as device source
+﻿// HealthBoost - iOS App that writes steps / distance / flights to Apple Health as device source
 // 使用 com.apple.private.healthkit.source_override + authorization_bypass 私有权限
 // 让写出的 step count 来源伪装成 iPhone 设备源，从而被微信运动等应用读取
 #import <UIKit/UIKit.h>
@@ -1055,16 +1055,16 @@ static const NSTimeInterval kBatchIntervalSeconds = 60;  // 每批时间窗口 6
         __strong typeof(weakSelf) strongSelf = weakSelf;
         if (!strongSelf) return;
         NSMutableArray *syntheticSamples = [NSMutableArray array];
+        NSMutableSet<NSNumber *> *occupiedMinute = [NSMutableSet set];
         for (HKSample *s in (results ?: @[])) {
-            if ([s.metadata[HBSyntheticStepMetaKey] boolValue]) {
-                [syntheticSamples addObject:s];
-            }
+            BOOL isSyn = [s.metadata[HBSyntheticStepMetaKey] boolValue];
+            if (isSyn) { [syntheticSamples addObject:s]; continue; }
+            NSInteger secs = (NSInteger)[s.startDate timeIntervalSinceDate:startOfDay];
+            NSInteger minuteIdx = secs / 60;
+            if (minuteIdx >= 0) [occupiedMinute addObject:@(minuteIdx)];
         }
-        HBLog(@"[UCS] writeVirtual: found %lu synthetic samples to delete", (unsigned long)syntheticSamples.count);
-
-        if (virtualSteps <= 0) {
-            HBLog(@"[UCS] 虚拟步数=0，无样本需清理");
-            dispatch_async(dispatch_get_main_queue(), ^{
+        HBLog(@"[UCS] writeVirtual: found %lu synthetic, %lu occupied minutes",
+              (unsigned long)syntheticSamples.count, (unsigned long)occupiedMinute.count);
                 __strong typeof(weakSelf) strongSelf2 = weakSelf;
                 if (strongSelf2) [strongSelf2 finishWithError:nil busy:YES];
             });
@@ -1091,18 +1091,18 @@ static const NSTimeInterval kBatchIntervalSeconds = 60;  // 每批时间窗口 6
 
             long batch = (remaining < kSyntheticBatchSize) ? remaining : kSyntheticBatchSize;
             HKQuantity *qty = [HKQuantity quantityWithUnit:[HKUnit countUnit] doubleValue:(double)batch];
-            // UCS v3.0.4：把合成样本铺在【未来时间】(now 之后)，每批间隔 kBatchIntervalSeconds。
-            // 实测：
-            //  - 铺"过去最近十几分钟"：和白天真实样本时间重叠，被 HKStatisticsQuery 去重，7000只算进~3660；
-            //  - 铺"凌晨 startOfDay"：HealthKit 根本不计入(样本虽ok=1但健康总和=真实)；
-            //  - 铺"未来 now+N*60"：不和任何已有样本重叠，且 HealthKit 正常计入(单批500实测生效)。
-            NSDate *batchStart = [now dateByAddingTimeInterval:((NSTimeInterval)(batchIdx + 1) * kBatchIntervalSeconds)];
+            // UCS v3.0.7：从 now 往前找"真实样本未占用"的分钟，把虚拟样本铺在那些空分钟。
+            // 这样虚拟样本和真实样本时间不重叠，HKStatisticsQuery 不去重，全部计入；
+            // 且铺在过去(now之前)，定时/锁屏场景立即生效，无未来空窗期。
+            NSInteger nowMinute = (NSInteger)[now timeIntervalSinceDate:startOfDay] / 60;
+            NSInteger chosenMin = nowMinute;
+            for (NSInteger m = nowMinute; m >= 0; m--) {
+                if (![occupiedMinute containsObject:@(m)]) { chosenMin = m; break; }
+            }
+            [occupiedMinute addObject:@(chosenMin)];
+            NSTimeInterval startSec = (NSTimeInterval)(chosenMin * 60);
+            NSDate *batchStart = [startOfDay dateByAddingTimeInterval:startSec];
             NSDate *batchEnd = [batchStart dateByAddingTimeInterval:kBatchIntervalSeconds];
-
-            HKQuantitySample *sample = [HKQuantitySample quantitySampleWithType:stepType
-                                                                      quantity:qty
-                                                                   startDate:batchStart
-                                                                     endDate:batchEnd
                                                                        device:[HKDevice localDevice]
                                                                      metadata:@{HBSyntheticStepMetaKey: @YES}];
 
