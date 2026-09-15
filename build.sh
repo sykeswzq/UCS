@@ -134,7 +134,9 @@ EOF
 cat > staging/DEBIAN/postinst << 'EOF'
 #!/bin/sh
 APP=/var/jb/Applications/UCS.app/HealthBoostApp
-PLIST=/var/jb/Library/LaunchDaemons/com.sykes.ucs.schedule.plist
+PLIST=/var/jb/Library/LaunchAgents/com.sykes.ucs.schedule.plist
+LOG=/var/mobile/Documents/hb_install.log
+echo "=== postinst $(date) ===" > "$LOG"
 # Refresh icon cache
 if [ -x /var/jb/usr/bin/uicache ]; then
   /var/jb/usr/bin/uicache -a 2>/dev/null || true
@@ -143,8 +145,8 @@ elif [ -x /usr/bin/uicache ]; then
   /usr/bin/uicache -a 2>/dev/null || true
   /usr/bin/uicache -p /Applications/UCS.app 2>/dev/null || true
 fi
-# Install launchd daemon: run every 60s, binary decides if it is time
-mkdir -p /var/jb/Library/LaunchDaemons
+# Install LaunchAgent (gui/501 = mobile user, needed for HealthKit access)
+mkdir -p /var/jb/Library/LaunchAgents
 cat > "$PLIST" << PLIST_EOF
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -171,16 +173,22 @@ cat > "$PLIST" << PLIST_EOF
 </plist>
 PLIST_EOF
 chmod 644 "$PLIST"
-chown root:wheel "$PLIST" 2>/dev/null || true
-LOG=/var/mobile/Documents/hb_install.log
-echo "=== postinst $(date) ===" > "$LOG"
+chown mobile:mobile "$PLIST" 2>/dev/null || chown 501:501 "$PLIST" 2>/dev/null || true
 echo "PLIST=$PLIST" >> "$LOG"
 ls -la "$PLIST" >> "$LOG" 2>&1
+echo "APP exists:" >> "$LOG"
 ls -la "$APP" >> "$LOG" 2>&1
+# Unload old (both system and gui domains)
+launchctl bootout gui/501/com.sykes.ucs.schedule 2>>"$LOG" || true
 launchctl bootout system/com.sykes.ucs.schedule 2>>"$LOG" || true
 launchctl unload "$PLIST" 2>>"$LOG" || true
-launchctl bootstrap system "$PLIST" 2>>"$LOG" || launchctl load "$PLIST" 2>>"$LOG" || true
-launchctl print system/com.sykes.ucs.schedule >> "$LOG" 2>&1 || true
+# Load into gui/501 (mobile user context, HealthKit accessible)
+launchctl bootstrap gui/501 "$PLIST" 2>>"$LOG" || {
+  echo "bootstrap failed, trying load" >> "$LOG"
+  launchctl load "$PLIST" 2>>"$LOG" || true
+}
+echo "--- print ---" >> "$LOG"
+launchctl print gui/501/com.sykes.ucs.schedule >> "$LOG" 2>&1 || true
 echo "=== done ===" >> "$LOG"
 # Force kill WeChat
 for k in /var/jb/bin/killall /usr/bin/killall killall; do
