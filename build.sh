@@ -13,7 +13,7 @@ set -eu
 #   4) Entitlements must include roothide 4 basic permissions + healthkit private permission
 
 # Version: v3.0.3 (鍚堟垚鏍锋湰鏀归摵鍑屾櫒鏃舵锛岄伩寮€HealthKit鏃堕棿閲嶅彔鍘婚噸瀵艰嚧鐨勬鏁颁涪澶?
-VER=3.0.5
+VER=3.0.6
 echo "Version: $VER"
 PKG="com.sykes.ucs"
 OUT="${PKG}_${VER}_iphoneos-arm64e.deb"
@@ -126,7 +126,8 @@ Installed-Size: 1152
 Depends: firmware (>= 13.0)
 Maintainer: sykeswzq
 Author: sykeswzq
-Description: UCS - 杩愬姩鏁版嵁娉ㄥ叆宸ュ叿锛屾敮鎸佸井淇℃鏁板悓姝ャ€?Section: utilities
+Description: UCS - inject virtual steps into HealthKit, syncs WeChat step counter
+Section: utilities
 Priority: optional
 EOF
 
