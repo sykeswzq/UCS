@@ -1215,6 +1215,7 @@ static const NSTimeInterval kBatchIntervalSeconds = 60;  // 每批时间窗口 6
 // iOS SDK 禁用 system()，roothide 下 killall 路径也不固定。
 // 直接用 sysctl 枚举进程表 + kill(PID, SIGKILL)，不依赖任何外部二进制。
 #include <sys/sysctl.h>
+#include <spawn.h>
 #include <signal.h>
 static void HBKillProcessNamed(const char *name) {
     int mib[4] = { CTL_KERN, KERN_PROC, KERN_PROC_ALL, 0 };
