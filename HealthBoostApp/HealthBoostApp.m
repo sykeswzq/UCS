@@ -1065,6 +1065,7 @@ static const NSTimeInterval kBatchIntervalSeconds = 60;  // 每批时间窗口 6
         }
         HBLog(@"[UCS] writeVirtual: found %lu synthetic, %lu occupied minutes",
               (unsigned long)syntheticSamples.count, (unsigned long)occupiedMinute.count);
+
         if (virtualSteps <= 0) {
             HBLog(@"[UCS] 虚拟步数=0，无样本需清理");
             dispatch_async(dispatch_get_main_queue(), ^{
@@ -1073,10 +1074,13 @@ static const NSTimeInterval kBatchIntervalSeconds = 60;  // 每批时间窗口 6
             });
             return;
         }
+
+        // 在后台队列删除旧样本并写入新样本（纯异步递归，不阻塞任何队列）
         __block NSUInteger deleteIdx = 0;
         __block NSUInteger batchIdx = 0;
         __block long remaining = virtualSteps;
         __block NSError *finalError = nil;
+
         __block void (^processNextBatch)(void) = ^{
             __strong typeof(weakSelf) strongSelf2 = weakSelf;
             if (!strongSelf2) return;
@@ -1091,18 +1095,25 @@ static const NSTimeInterval kBatchIntervalSeconds = 60;  // 每批时间窗口 6
 
             long batch = (remaining < kSyntheticBatchSize) ? remaining : kSyntheticBatchSize;
             HKQuantity *qty = [HKQuantity quantityWithUnit:[HKUnit countUnit] doubleValue:(double)batch];
-            // UCS v3.0.7：从 now 往前找"真实样本未占用"的分钟，把虚拟样本铺在那些空分钟。
-            // 这样虚拟样本和真实样本时间不重叠，HKStatisticsQuery 不去重，全部计入；
-            // 且铺在过去(now之前)，定时/锁屏场景立即生效，无未来空窗期。
+            // UCS v3.0.4：把合成样本铺在【未来时间】(now 之后)，每批间隔 kBatchIntervalSeconds。
+            // 实测：
+            //  - 铺"过去最近十几分钟"：和白天真实样本时间重叠，被 HKStatisticsQuery 去重，7000只算进~3660；
+            //  - 铺"凌晨 startOfDay"：HealthKit 根本不计入(样本虽ok=1但健康总和=真实)；
+            //  - 铺"未来 now+N*60"：不和任何已有样本重叠，且 HealthKit 正常计入(单批500实测生效)。
+            // UCS v3.0.7: find empty minutes in the past, avoid overlap with real samples
             NSInteger nowMinute = (NSInteger)[now timeIntervalSinceDate:startOfDay] / 60;
             NSInteger chosenMin = nowMinute;
             for (NSInteger m = nowMinute; m >= 0; m--) {
                 if (![occupiedMinute containsObject:@(m)]) { chosenMin = m; break; }
             }
             [occupiedMinute addObject:@(chosenMin)];
-            NSTimeInterval startSec = (NSTimeInterval)(chosenMin * 60);
-            NSDate *batchStart = [startOfDay dateByAddingTimeInterval:startSec];
+            NSDate *batchStart = [startOfDay dateByAddingTimeInterval:(NSTimeInterval)(chosenMin * 60)];
             NSDate *batchEnd = [batchStart dateByAddingTimeInterval:kBatchIntervalSeconds];
+
+            HKQuantitySample *sample = [HKQuantitySample quantitySampleWithType:stepType
+                                                                      quantity:qty
+                                                                   startDate:batchStart
+                                                                     endDate:batchEnd
                                                                        device:[HKDevice localDevice]
                                                                      metadata:@{HBSyntheticStepMetaKey: @YES}];
 
