@@ -443,6 +443,7 @@ static HKQuantitySample *HBMakeDeviceSample(HKQuantityType *type,
 @property (assign, nonatomic) double ratio;        // 步距系数 0.5~0.8，用于推算距离
 @property (assign, nonatomic) BOOL enabled;
 @property (assign, nonatomic) BOOL scheduleOn;
+@property (assign, nonatomic) BOOL isCLI;
 @property (assign, nonatomic) NSInteger schedHour;
 @property (assign, nonatomic) NSInteger schedMinute;
 @property (assign, nonatomic) BOOL busy;
@@ -798,6 +799,8 @@ static NSString * const HBNotifRequestedKey = @"hb_notif_requested";
     NSUserDefaults *ud = [NSUserDefaults standardUserDefaults];
     [ud setObject:d forKey:HBSettingsKey];
     [ud synchronize];
+    // v3.0.9: 同步写一份到共享路径，供 launchd CLI 守护进程读取（root 用户读不到 App 沙盒）
+    [d writeToFile:@"/var/mobile/Documents/hb_schedule.plist" atomically:YES];
 }
 
 - (void)updateStatus:(NSString *)text { self.statusLabel.text = text; }
@@ -1242,11 +1245,34 @@ static void HBKillWeChat(void) {
     HBKillProcessNamed("UGGD");
 }
 
+// 生成后自动拉起微信后台，让它读 HealthKit 上传新步数（不用手动开微信）
+static void HBLaunchWeChat(void) {
+    const char *cands[] = {
+        "/var/jb/usr/bin/uiopen", "/usr/bin/uiopen",
+        "/var/jb/usr/bin/open", "/usr/bin/open",
+        NULL
+    };
+    for (int i = 0; cands[i]; i++) {
+        if (access(cands[i], X_OK) != 0) continue;
+        pid_t pid;
+        char *const argv[] = { (char *)cands[i], "com.tencent.xin", NULL };
+        if (posix_spawn(&pid, cands[i], NULL, NULL, argv, NULL) == 0) {
+            HBLog(@"[UCS] launched WeChat via %s", cands[i]);
+            return;
+        }
+    }
+    HBLog(@"[UCS] no launcher found, WeChat not auto-launched");
+}
+
 - (void)finishSuccess:(HKSourceRevision *)deviceRev {
     self.busy = NO;
     [HBTodayString() writeToFile:HBLastGenPath() atomically:YES encoding:NSUTF8StringEncoding error:nil];
+    [HBTodayString() writeToFile:@"/var/mobile/Documents/hb_lastgen.txt" atomically:YES encoding:NSUTF8StringEncoding error:nil];
     [self updateStatus:@"运动数据已生成，正在重启微信以刷新步数…"];
     HBKillWeChat();
+    sleep(2);  // 等杀进程落地
+    HBLaunchWeChat();
+    if (self.isCLI) { NSLog(@"[UCS] CLI done, exit"); exit(0); }
 }
 
 - (void)finishWithError:(NSError *)error busy:(BOOL)busyFlag {
@@ -1254,8 +1280,8 @@ static void HBKillWeChat(void) {
     self.busy = NO;
     if (error) {
         [self updateStatus:@"写入失败"];
-        NSString *msg = error.localizedDescription;
-        [self showAlert:@"写入失败" message:msg];
+        if (self.isCLI) { NSLog(@"[UCS] CLI error: %@", error); exit(1); }
+        [self showAlert:@"写入失败" message:error.localizedDescription];
     } else {
         [self finishSuccess:nil];
     }
@@ -1280,6 +1306,28 @@ static void HBKillWeChat(void) {
 
 int main(int argc, char * argv[]) {
     @autoreleasepool {
+        if (argc > 1 && strcmp(argv[1], "--auto-generate") == 0) {
+            NSLog(@"[UCS] CLI auto-generate mode");
+            NSDictionary *cfg = [NSDictionary dictionaryWithContentsOfFile:@"/var/mobile/Documents/hb_schedule.plist"];
+            if (![[cfg objectForKey:@"scheduleOn"] boolValue]) { NSLog(@"[UCS] schedule off, exit"); return 0; }
+            NSDateFormatter *f = [[NSDateFormatter alloc] init]; f.dateFormat = @"yyyy-MM-dd";
+            NSString *today = [f stringFromDate:[NSDate date]];
+            NSString *last = [NSString stringWithContentsOfFile:@"/var/mobile/Documents/hb_lastgen.txt" encoding:NSUTF8StringEncoding error:nil];
+            if ([[last stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]] isEqualToString:today]) { NSLog(@"[UCS] already generated today, exit"); return 0; }
+            NSInteger sh = [[cfg objectForKey:@"hour"] integerValue];
+            NSInteger sm = [[cfg objectForKey:@"minute"] integerValue];
+            NSCalendar *cal = [NSCalendar currentCalendar];
+            NSDateComponents *nc = [cal components:NSCalendarUnitHour|NSCalendarUnitMinute fromDate:[NSDate date]];
+            if (nc.hour < sh || (nc.hour == sh && nc.minute < sm)) { NSLog(@"[UCS] not time yet, exit"); return 0; }
+            HBMainViewController *vc = [[HBMainViewController alloc] init];
+            vc.isCLI = YES;
+            [vc loadSettings];
+            dispatch_async(dispatch_get_main_queue(), ^{
+                [vc generateNow];
+            });
+            while (CFRunLoopRunInMode(kCFRunLoopDefaultMode, 1.0, TRUE) == kCFRunLoopRunTimedOut) {}
+            return 0;
+        }
         return UIApplicationMain(argc, argv, nil, NSStringFromClass([AppDelegate class]));
     }
 }
