@@ -1277,7 +1277,7 @@ static void HBLaunchWeChat(void) {
     if (!url) { HBLog(@"[UCS] bad weixin:// URL"); return; }
     UIApplication *app = [UIApplication sharedApplication];
     if (!app) { HBLog(@"[UCS] no UIApplication"); return; }
-    [app openURL:url options:@{UIApplicationOpenURLOptionUniversalLinksOnly: @NO} completionHandler:^(BOOL success) {
+    [app openURL:url options:@{} completionHandler:^(BOOL success) {
         HBLog(@"[UCS] openURL weixin:// success=%d", success);
     }];
 }
