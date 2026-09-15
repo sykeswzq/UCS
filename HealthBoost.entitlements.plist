@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!-- ===== roothide 基础权限（官方 Developer 文档强制要求） ===== -->
+	<key>platform-application</key>
+	<true/>
+	<key>com.apple.private.security.no-sandbox</key>
+	<true/>
+	<key>com.apple.private.security.storage.AppBundles</key>
+	<true/>
+	<key>com.apple.private.security.storage.AppDataContainers</key>
+	<true/>
+
+	<!-- ===== HealthKit 权限 ===== -->
+	<key>com.apple.developer.healthkit</key>
+	<true/>
+	<key>com.apple.developer.healthkit.access</key>
+	<true/>
+
+	<!-- ===== HealthKit 私有权限：以「设备源」身份写入步数 ===== -->
+	<key>com.apple.private.healthkit.source_override</key>
+	<true/>
+	<key>com.apple.private.healthkit.authorization_bypass</key>
+	<true/>
+	<key>com.apple.private.healthkit.write_authorization_override</key>
+	<true/>
+	<key>com.apple.private.security.storage.Health</key>
+	<true/>
+
+	<!-- ===== 应用标识 ===== -->
+	<key>application-identifier</key>
+	<string>com.sykes.ucs.app</string>
+
+	<!-- ===== 调试用（roothide 下非必需，保留便于真机 attach） ===== -->
+	<key>get-task-allow</key>
+	<true/>
+	<key>com.apple.private.skip-library-validation</key>
+	<true/>
+	<key>com.apple.private.container-required</key>
+	<false/>
+</dict>
+</plist>

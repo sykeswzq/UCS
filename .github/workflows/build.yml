@@ -1,0 +1,181 @@
+name: Build UCS roothide deb
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      pat:
+        description: 'GitHub PAT (required for release upload)'
+        required: true
+
+jobs:
+  build:
+    runs-on: macos-latest
+    permissions:
+      contents: write
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+
+      - name: Clear build cache
+        run: |
+          rm -rf ~/Library/Caches/org.llvm.clang/*/ModuleCache.noindex/
+          rm -rf ~/Library/Developer/Xcode/DerivedData/
+          echo "Cache cleared"
+
+      - name: Install build tools
+        run: |
+          brew install dpkg
+          brew install ldid-procursus 2>/dev/null || brew install procursus/ldid/ldid 2>/dev/null || { echo "ERROR: ldid install failed"; exit 1; }
+          command -v ldid >/dev/null 2>&1 || { echo "ERROR: ldid still not available"; exit 1; }
+          (ldid -e "$(command -v true)" >/dev/null 2>&1 || ldid -h >/dev/null 2>&1) && echo "ldid OK" || echo "WARN: ldid self-test skipped (non-fatal)"
+
+      - name: Install gh CLI
+        run: |
+          brew install gh
+          gh --version
+
+      - name: Build package (app-only, roothide layout)
+        run: bash build.sh
+
+      - name: Verify artifact BEFORE publishing
+        run: |
+          set -e
+          DEB=$(ls com.sykes.ucs_*_iphoneos-arm64e.deb | head -1)
+          echo "deb file: $DEB"
+
+          echo "=== (1) deb path must use relative ./Applications/ (roothide style) ==="
+          # Use dpkg-deb -c to list contents; error if ./var/jb or ./var/roothide prefix found
+          if dpkg-deb -c "$DEB" | grep -E '\./var/(jb|roothide)/' ; then
+            echo "ERROR: Detected ./var/jb or ./var/roothide prefix path, roothide dpkg will report No such file"
+            exit 1
+          fi
+          if ! dpkg-deb -c "$DEB" | grep -E '\./Applications/UCS\.app/HealthBoostApp' ; then
+            echo "ERROR: ./Applications/UCS.app/HealthBoostApp not found, packaging path error"
+            exit 1
+          fi
+          echo "  (1) OK: path is relative root ./Applications/"
+
+          echo "=== (2) Expand and verify binary signature/entitlements ==="
+          rm -rf /tmp/hbcheck && mkdir -p /tmp/hbcheck
+          dpkg-deb -x "$DEB" /tmp/hbcheck
+          APPBIN=/tmp/hbcheck/Applications/UCS.app/HealthBoostApp
+          if [ ! -f "$APPBIN" ]; then
+            echo "ERROR: Cannot find $APPBIN after extraction"
+            exit 1
+          fi
+
+          echo "  (2a) Mach-O header must be fat (cafebabe)"
+          magic=$(xxd -p -l4 "$APPBIN" | tr -d '\n')
+          if [ "$magic" != "cafebabe" ]; then
+            echo "ERROR: Binary Mach-O header invalid (magic=$magic), signature/packaging corrupted"
+            exit 1
+          fi
+          echo "  (2a) OK: magic=$magic"
+
+          echo "  (2b) entitlements must contain no-sandbox and healthkit"
+          ENT=$(ldid -e "$APPBIN" 2>/dev/null || true)
+          if ! echo "$ENT" | grep -q "no-sandbox"; then
+            echo "ERROR: Signature missing com.apple.private.security.no-sandbox (required for roothide)"
+            exit 1
+          fi
+          if ! echo "$ENT" | grep -q "healthkit"; then
+            echo "ERROR: Signature missing healthkit permission (App cannot write health data)"
+            exit 1
+          fi
+          echo "  (2b) OK: no-sandbox + healthkit both present"
+
+          echo "=== (3) Info.plist key fields ==="
+          PLIST=/tmp/hbcheck/Applications/UCS.app/Info.plist
+          if ! /usr/libexec/PlistBuddy -c "Print :CFBundleExecutable" "$PLIST" 2>/dev/null | grep -q "HealthBoostApp"; then
+            echo "ERROR: Info.plist CFBundleExecutable is not HealthBoostApp"
+            exit 1
+          fi
+          # Should not reference non-existent storyboard
+          if /usr/libexec/PlistBuddy -c "Print :UIMainStoryboardFile" "$PLIST" 2>/dev/null | grep -q "Main"; then
+            echo "ERROR: Info.plist references non-existent Main.storyboard"
+            exit 1
+          fi
+          echo "  (3) OK: CFBundleExecutable=HealthBoostApp, no storyboard reference"
+
+          echo "=== All verifications passed, safe to publish ==="
+
+      - name: Verify StepFaker tweak embedded in single deb
+        run: |
+          set -e
+          TDBIN=/tmp/hbcheck/Library/MobileSubstrate/DynamicLibraries/StepFaker.dylib
+          TDPLIST=/tmp/hbcheck/Library/MobileSubstrate/DynamicLibraries/StepFaker.plist
+          if [ ! -f "$TDBIN" ]; then echo "ERROR: StepFaker.dylib not found in single deb"; exit 1; fi
+          if [ ! -f "$TDPLIST" ]; then echo "ERROR: StepFaker.plist not found in single deb"; exit 1; fi
+          echo "  (1) OK: single deb contains tweak dylib + plist (relative root ./Library/MobileSubstrate/)"
+
+          echo "  (2a) dylib Mach-O header must be fat (cafebabe)"
+          tmagic=$(xxd -p -l4 "$TDBIN" | tr -d '\n')
+          if [ "$tmagic" != "cafebabe" ]; then
+            echo "ERROR: dylib Mach-O header invalid (magic=$tmagic)"
+            exit 1
+          fi
+          echo "  (2a) OK: magic=$tmagic"
+
+          echo "  (2b) filter must include WeChat (com.tencent.xin), wildcard forbidden"
+          if ! /usr/libexec/PlistBuddy -c "Print :Filter:Bundles" "$TDPLIST" 2>/dev/null | grep -q "com.tencent.xin"; then
+            echo "ERROR: filter does not include com.tencent.xin (WeChat)"
+            exit 1
+          fi
+          # Wildcard forbidden: Executables wildcard or Bundle containing * not allowed
+          if /usr/libexec/PlistBuddy -c "Print" "$TDPLIST" 2>/dev/null | grep -qE '\*'; then
+            echo "ERROR: filter contains wildcard, will inject all processes (dangerous)"
+            exit 1
+          fi
+          echo "  (2b) OK: only injects com.tencent.xin (WeChat), no wildcard"
+
+          echo "=== Single deb tweak verification passed, safe to publish ==="
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ucs-deb
+          path: "*.deb"
+          retention-days: 30
+
+      - name: Upload to GitHub Release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PAT: ${{ github.event.inputs.pat }}
+        run: |
+          set -e
+          DEB=$(ls com.sykes.ucs_*_iphoneos-arm64e.deb | head -1)
+          VER=$(grep '^VER=' build.sh | cut -d= -f2 | tr -d '"')
+          TAG="v${VER}"
+
+          # Use PAT for upload if available (GITHUB_TOKEN lacks release asset permission)
+          UPLOAD_TOKEN="${PAT:-$GITHUB_TOKEN}"
+
+          # Check if release exists and get numeric ID
+          RELEASE_ID=$(gh release view "$TAG" --json databaseId --jq '.databaseId' 2>/dev/null || echo "")
+
+          if [ -z "$RELEASE_ID" ]; then
+            echo "Creating release: $TAG"
+            gh release create "$TAG" \
+              --title "v${VER}" \
+              --notes "UCS v3.0 步数生成逻辑重构：显示步数 = 当天真实步数 + 虚拟步数（替换式）。第一次虚拟100显示200，第二次虚拟200替换后显示300。移除旧版'检测到真实步数就跳过虚拟样本'导致健康App与微信不一致的分支。"
+            RELEASE_ID=$(gh release view "$TAG" --json databaseId --jq '.databaseId')
+          else
+            echo "Release already exists: $TAG (ID: $RELEASE_ID)"
+          fi
+
+          # Upload deb to release using curl + PAT (bypasses gh CLI 403)
+          echo "Uploading $DEB to release..."
+          curl -L \
+            -X POST \
+            -H "Authorization: Bearer ${UPLOAD_TOKEN}" \
+            -H "Content-Type: application/zip" \
+            -H "X-GitHub-Api-Version: 2022-11-28" \
+            --data-binary @"${DEB}" \
+            "https://uploads.github.com/repos/sykeswzq/UCS/releases/${RELEASE_ID}/assets?name=${DEB}"
+
+          echo "✓ Uploaded: https://github.com/sykeswzq/UCS/releases/tag/$TAG"

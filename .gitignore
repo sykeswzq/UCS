@@ -1,0 +1,37 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.egg-info/
+
+# Build outputs
+*.deb
+*.zip
+staging/
+tweak_staging/
+pkg/
+out/
+
+# Temporary files
+tree_body.json
+build_remote.sh
+check_ci.py
+diagnose_remote.py
+push_*.py
+build_*.sh
+*_v2214.m
+
+# Comparison/backup directories
+releases/_compare*
+releases/_old*
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
