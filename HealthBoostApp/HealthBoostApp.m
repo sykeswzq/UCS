@@ -892,8 +892,11 @@ static NSString * const HBNotifRequestedKey = @"hb_notif_requested";
     HKQuantityType *distType   = [HKQuantityType quantityTypeForIdentifier:HKQuantityTypeIdentifierDistanceWalkingRunning];
     HKQuantityType *flightType = [HKQuantityType quantityTypeForIdentifier:HKQuantityTypeIdentifierFlightsClimbed];
 
+    // UCS v3.0.5：endDate 不能是 now。新合成样本铺在"未来 now+N*60"，若查询 endDate=now，
+    // 未来样本落在窗口外，下次生成时查不到旧虚拟样本、删不掉，导致累加。endDate 给到 48 小时后。
+    NSDate *endOfWindow = [startOfDay dateByAddingTimeInterval:86400.0 * 2];
     NSPredicate *todayPred = [HKQuery predicateForSamplesWithStartDate:startOfDay
-                                                              endDate:now
+                                                              endDate:endOfWindow
                                                             options:HKQueryOptionNone];
     HKSampleQuery *query = [[HKSampleQuery alloc] initWithSampleType:stepType
                                                           predicate:todayPred
@@ -1039,7 +1042,9 @@ static const NSTimeInterval kBatchIntervalSeconds = 60;  // 每批时间窗口 6
     NSCalendar *cal = [NSCalendar currentCalendar];
     NSDate *now = [NSDate date];
     NSDate *startOfDay = [cal startOfDayForDate:now];
-    NSPredicate *pred = [HKQuery predicateForSamplesWithStartDate:startOfDay endDate:now options:HKQueryOptionNone];
+    // v3.0.5：同主流程，endDate 必须覆盖未来样本（铺在 now+N*60），否则删不掉
+    NSDate *endOfWindow = [startOfDay dateByAddingTimeInterval:86400.0 * 2];
+    NSPredicate *pred = [HKQuery predicateForSamplesWithStartDate:startOfDay endDate:endOfWindow options:HKQueryOptionNone];
 
     // 纯异步递归：第一步查询合成样本，完成后在后台队列处理
     HKSampleQuery *delQ = [[HKSampleQuery alloc] initWithSampleType:stepType
