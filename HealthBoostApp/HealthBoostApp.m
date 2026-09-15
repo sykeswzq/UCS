@@ -1223,9 +1223,10 @@ static const NSTimeInterval kBatchIntervalSeconds = 60;  // 每批时间窗口 6
             [self _writeSteps:steps dist:distM flights:flights deviceRev:deviceRev index:index + 1];
         } else {
             HBLog(@"[UCS] all writes complete");
+            // v3.1.6: 不在这里调 finishSuccess，等 writeVirtualStepSample 完成后
+            // 通过 finishWithError:nil 统一调一次，避免双重调用。
             [self writeVirtualStepSample:steps];
             dispatch_async(dispatch_get_main_queue(), ^{
-                [self finishSuccess:deviceRev];
                 [self verifyStepsWritten];
             });
         }
