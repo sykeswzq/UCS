@@ -927,9 +927,6 @@ static NSString * const HBNotifRequestedKey = @"hb_notif_requested";
             BOOL isMine = (myBid != nil && bid != nil && [bid isEqualToString:myBid]);
             if (isDevice || isHealthApp || isMine) [deviceSamples addObject:s];
         }
-        HBLog(@"[UCS] deletable old synthetic samples: %lu (of %lu total today)",
-              (unsigned long)oldSynthetic.count, (unsigned long)samples.count);
-
         __weak typeof(self) weakSelf = self;
         // 修复(V2.0.2)：绝不删除真实设备/健康样本，仅清掉本 App 之前写的合成样本
         // （HBSyntheticStepMetaKey 标记），避免真实步数被抹。原逻辑会 deleteObject 设备/健康源样本。
@@ -937,6 +934,8 @@ static NSString * const HBNotifRequestedKey = @"hb_notif_requested";
         for (HKSample *s in deviceSamples) {
             if ([s.metadata[HBSyntheticStepMetaKey] boolValue]) [oldSynthetic addObject:s];
         }
+        HBLog(@"[UCS] deletable old synthetic samples: %lu (of %lu total today)",
+              (unsigned long)oldSynthetic.count, (unsigned long)samples.count);
         void (^startWrite)(void) = ^{
             HBLog(@"[UCS] start writing: steps=%ld dist=%.1f flights=%ld", steps, distanceMeters, flights);
             [weakSelf _writeSteps:steps dist:distanceMeters flights:flights deviceRev:deviceRev index:0];
@@ -1185,22 +1184,29 @@ static const NSTimeInterval kBatchIntervalSeconds = 60;  // 每批时间窗口 6
 // 生成完成后杀掉微信进程：tweak 注入在微信进程内，微信不主动重读步数时
 // 光写 HealthKit 不会让微信运动立刻刷新。杀掉后下次打开微信会重新注入、
 // 重新读 CMPedometer/HealthKit，立即显示 真实+虚拟。
+// iOS SDK 禁用 system()，改用 posix_spawn 直接执行 killall。
+#include <spawn.h>
+extern char **environ;
+static void HBExecKillall(NSString *path) {
+    const char *p = path.UTF8String;
+    if (access(p, X_OK) != 0) return;
+    pid_t pid = 0;
+    const char *argvW[] = { p, "-9", "WeChat", NULL };
+    const char *argvU[] = { p, "-9", "UGGD", NULL };
+    posix_spawn(&pid, p, NULL, NULL, (char *const *)argvW, environ);
+    if (pid > 0) waitpid(pid, NULL, WNOHANG);
+    posix_spawn(&pid, p, NULL, NULL, (char *const *)argvU, environ);
+    if (pid > 0) waitpid(pid, NULL, WNOHANG);
+    HBLog(@"[UCS] 已执行 %s -9 WeChat UGGD", p);
+}
 static void HBKillWeChat(void) {
-    NSArray *killallPaths = @[
+    for (NSString *p in @[
         @"/var/jb/bin/killall",
         @"/var/jb/usr/bin/killall",
         @"/usr/bin/killall",
         @"/bin/killall"
-    ];
-    for (NSString *p in killallPaths) {
-        if (access(p.UTF8String, X_OK) == 0) {
-            char cmd[300];
-            snprintf(cmd, sizeof(cmd), "%s -9 WeChat 2>/dev/null; %s -9 UGGD 2>/dev/null",
-                     p.UTF8String, p.UTF8String);
-            system(cmd);
-            HBLog(@"[UCS] 已执行 %s -9 WeChat UGGD（微信下次打开即刷新步数）", p.UTF8String);
-            return;
-        }
+    ]) {
+        if (access(p.UTF8String, X_OK) == 0) { HBExecKillall(p); return; }
     }
     HBLog(@"[UCS] 未找到 killall，未能自动重启微信（请手动杀掉微信重开）");
 }

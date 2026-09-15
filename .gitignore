@@ -12,6 +12,8 @@ staging/
 tweak_staging/
 pkg/
 out/
+out_deb/
+_buildlog.txt
 
 # Temporary files
 tree_body.json
