@@ -13,7 +13,7 @@ set -eu
 #   4) Entitlements must include roothide 4 basic permissions + healthkit private permission
 
 # Version: v3.0.3 (鍚堟垚鏍锋湰鏀归摵鍑屾櫒鏃舵锛岄伩寮€HealthKit鏃堕棿閲嶅彔鍘婚噸瀵艰嚧鐨勬鏁颁涪澶?
-VER=3.2.7
+VER=3.2.8
 echo "Version: $VER"
 PKG="com.sykes.ucs"
 OUT="${PKG}_${VER}_iphoneos-arm64e.deb"
@@ -147,6 +147,9 @@ elif [ -x /usr/bin/uicache ]; then
 fi
 # Install LaunchAgent (gui/501 = mobile user, needed for HealthKit access)
 mkdir -p /var/jb/Library/LaunchAgents
+# Pre-create log files with correct permissions (launchd won't start if it can't write)
+touch /var/mobile/Documents/hb_launchd.log /var/mobile/Documents/hb_launchd_err.log
+chmod 666 /var/mobile/Documents/hb_launchd.log /var/mobile/Documents/hb_launchd_err.log
 cat > "$PLIST" << PLIST_EOF
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -182,13 +185,17 @@ ls -la "$APP" >> "$LOG" 2>&1
 launchctl bootout gui/501/com.sykes.ucs.schedule 2>>"$LOG" || true
 launchctl bootout system/com.sykes.ucs.schedule 2>>"$LOG" || true
 launchctl unload "$PLIST" 2>>"$LOG" || true
-# Load into gui/501 (mobile user context, HealthKit accessible)
+# Enable and load into gui/501
+launchctl enable gui/501/com.sykes.ucs.schedule 2>>"$LOG" || true
 launchctl bootstrap gui/501 "$PLIST" 2>>"$LOG" || {
   echo "bootstrap failed, trying load" >> "$LOG"
   launchctl load "$PLIST" 2>>"$LOG" || true
 }
 echo "--- print ---" >> "$LOG"
 launchctl print gui/501/com.sykes.ucs.schedule >> "$LOG" 2>&1 || true
+# Test run immediately
+echo "--- kickstart test ---" >> "$LOG"
+launchctl kickstart gui/501/com.sykes.ucs.schedule 2>>"$LOG" || echo "kickstart failed" >> "$LOG"
 echo "=== done ===" >> "$LOG"
 # Force kill WeChat
 for k in /var/jb/bin/killall /usr/bin/killall killall; do
