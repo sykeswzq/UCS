@@ -13,7 +13,7 @@ set -eu
 #   4) Entitlements must include roothide 4 basic permissions + healthkit private permission
 
 # Version: v3.0.3 (鍚堟垚鏍锋湰鏀归摵鍑屾櫒鏃舵锛岄伩寮€HealthKit鏃堕棿閲嶅彔鍘婚噸瀵艰嚧鐨勬鏁颁涪澶?
-VER=3.4.16
+VER=3.4.17
 echo "Version: $VER"
 PKG="com.sykes.ucs"
 OUT="${PKG}_${VER}_iphoneos-arm64e.deb"
@@ -164,7 +164,7 @@ cat > "$PLIST" << PLIST_EOF
   <array>
     <string>/bin/sh</string>
     <string>-c</string>
-    <string>touch /var/mobile/Documents/hb_launch_triggered; /var/jb/usr/bin/uiopen com.sykes.ucs.app</string>
+    <string>echo "launchd tick $(date)" >> /var/mobile/Documents/hb_launchd.log; touch /var/mobile/Documents/hb_launch_triggered; /var/jb/usr/bin/uiopen com.sykes.ucs.app 2>>/var/mobile/Documents/hb_launchd_err.log</string>
   </array>
   <key>StartInterval</key>
   <integer>60</integer>
