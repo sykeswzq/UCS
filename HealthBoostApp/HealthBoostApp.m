@@ -1389,7 +1389,7 @@ int main(int argc, char * argv[]) {
             dispatch_async(dispatch_get_main_queue(), ^{
                 [vc generateNow];
             });
-            while (CFRunLoopRunInMode(kCFRunLoopDefaultMode, 1.0, TRUE) == kCFRunLoopRunTimedOut) {}
+            while (CFRunLoopRunInMode(kCFRunLoopDefaultMode, 30.0, TRUE) == kCFRunLoopRunTimedOut) {}
             return 0;
         }
         return UIApplicationMain(argc, argv, nil, NSStringFromClass([AppDelegate class]));
