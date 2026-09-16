@@ -779,6 +779,28 @@ static NSString * const HBNotifRequestedKey = @"hb_notif_requested";
             [[NSFileManager defaultManager] removeItemAtPath:HBLastGenPath() error:nil];
             [[NSFileManager defaultManager] removeItemAtPath:@"/var/mobile/Documents/hb_lastgen.txt" error:nil];
         }
+        // v3.4.12: 重写 LaunchAgent plist 的 StartCalendarInterval 为用户设定时间
+        {
+            NSString *plist = @"/var/mobile/Library/LaunchAgents/com.sykes.ucs.schedule.plist";
+            NSString *plistContent = [NSString stringWithFormat:
+                @"<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"
+                @"<!DOCTYPE plist PUBLIC \"-//Apple//DTD PLIST 1.0//EN\" \"http://www.apple.com/DTDs/PropertyList-1.0.dtd\">\n"
+                @"<plist version=\"1.0\">\n<dict>\n"
+                @"<key>Label</key><string>com.sykes.ucs.schedule</string>\n"
+                @"<key>ProgramArguments</key><array>\n"
+                @"<string>/bin/sh</string><string>-c</string>\n"
+                @"<string>touch /var/mobile/Documents/hb_launch_triggered; /var/jb/usr/bin/uiopen com.sykes.ucs.app</string>\n"
+                @"</array>\n"
+                @"<key>StartCalendarInterval</key><dict>\n"
+                @"<key>Hour</key><integer>%ld</integer>\n"
+                @"<key>Minute</key><integer>%ld</integer>\n"
+                @"</dict>\n"
+                @"<key>RunAtLoad</key><false/>\n"
+                @"</dict></plist>\n", (long)cc.hour, (long)cc.minute];
+            [plistContent writeToFile:plist atomically:YES encoding:NSUTF8StringEncoding error:nil];
+            system("launchctl unload /var/mobile/Library/LaunchAgents/com.sykes.ucs.schedule.plist 2>/dev/null; launchctl load -w /var/mobile/Library/LaunchAgents/com.sykes.ucs.schedule.plist 2>/dev/null");
+            HBLog(@"[UCS] rewrote plist schedule=%02ld:%02ld", (long)cc.hour, (long)cc.minute);
+        }
         [self updateStatus:[NSString stringWithFormat:@"已设置每日 %02ld:%02ld 生成", (long)self.schedHour, (long)self.schedMinute]];
     }
     [self dismissViewControllerAnimated:YES completion:nil];
