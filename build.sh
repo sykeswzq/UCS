@@ -13,7 +13,7 @@ set -eu
 #   4) Entitlements must include roothide 4 basic permissions + healthkit private permission
 
 # Version: v3.0.3 (鍚堟垚鏍锋湰鏀归摵鍑屾櫒鏃舵锛岄伩寮€HealthKit鏃堕棿閲嶅彔鍘婚噸瀵艰嚧鐨勬鏁颁涪澶?
-VER=3.3.0
+VER=3.3.1
 echo "Version: $VER"
 PKG="com.sykes.ucs"
 OUT="${PKG}_${VER}_iphoneos-arm64e.deb"
@@ -134,7 +134,7 @@ EOF
 cat > staging/DEBIAN/postinst << 'EOF'
 #!/bin/sh
 APP=/var/jb/Applications/UCS.app/HealthBoostApp
-PLIST=/var/jb/Library/LaunchAgents/com.sykes.ucs.schedule.plist
+PLIST=/var/mobile/Library/LaunchAgents/com.sykes.ucs.schedule.plist
 LOG=/var/mobile/Documents/hb_install.log
 echo "=== postinst $(date) ===" > "$LOG"
 # Refresh icon cache
@@ -145,8 +145,8 @@ elif [ -x /usr/bin/uicache ]; then
   /usr/bin/uicache -a 2>/dev/null || true
   /usr/bin/uicache -p /Applications/UCS.app 2>/dev/null || true
 fi
-# Install LaunchAgent (gui/501 = mobile user, needed for HealthKit access)
-mkdir -p /var/jb/Library/LaunchAgents
+# Install LaunchAgent to standard mobile path (visible in user/foreground domain)
+mkdir -p /var/mobile/Library/LaunchAgents
 # Pre-create log files with correct permissions (launchd won't start if it can't write)
 touch /var/mobile/Documents/hb_launchd.log /var/mobile/Documents/hb_launchd_err.log
 chmod 666 /var/mobile/Documents/hb_launchd.log /var/mobile/Documents/hb_launchd_err.log
