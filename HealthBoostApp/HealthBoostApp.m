@@ -799,16 +799,11 @@ static NSString * const HBNotifRequestedKey = @"hb_notif_requested";
                 "<key>StandardErrorPath</key><string>/var/mobile/Documents/hb_launchd_err.log</string>\n"
                 "</dict></plist>\n";
             [plistContent writeToFile:plist atomically:YES encoding:NSUTF8StringEncoding error:nil];
-            const char *launchctlPath = "/var/jb/usr/bin/launchctl";
-            if (access(launchctlPath, X_OK) != 0) launchctlPath = "/usr/bin/launchctl";
-            pid_t pid;
-            char const *args1[] = {launchctlPath, "unload", "/var/jb/Library/LaunchAgents/com.sykes.ucs.schedule.plist", NULL};
-            int rc1 = posix_spawn(&pid, launchctlPath, NULL, NULL, (char* const*)args1, NULL);
-            int st1 = 0; if (rc1 == 0) waitpid(pid, &st1, 0);
-            char const *args2[] = {launchctlPath, "load", "-w", "/var/jb/Library/LaunchAgents/com.sykes.ucs.schedule.plist", NULL};
-            int rc2 = posix_spawn(&pid, launchctlPath, NULL, NULL, (char* const*)args2, NULL);
-            int st2 = 0; if (rc2 == 0) waitpid(pid, &st2, 0);
-            HBLog(@"[UCS] rewrote plist (jb path) unload rc=%d st=%d load rc=%d st=%d", rc1, st1, rc2, st2);
+            // v3.4.15: use dlsym system() (posix_spawn can't find launchctl path)
+            int (*system_fn)(const char *) = dlsym(RTLD_DEFAULT, "system");
+            int r1 = system_fn ? system_fn("launchctl unload /var/jb/Library/LaunchAgents/com.sykes.ucs.schedule.plist 2>/dev/null") : -999;
+            int r2 = system_fn ? system_fn("launchctl load -w /var/jb/Library/LaunchAgents/com.sykes.ucs.schedule.plist 2>/dev/null") : -999;
+            HBLog(@"[UCS] rewrote plist (jb path) system unload=%d load=%d", r1, r2);
         }
         [self updateStatus:[NSString stringWithFormat:@"已设置每日 %02ld:%02ld 生成", (long)self.schedHour, (long)self.schedMinute]];
     }
