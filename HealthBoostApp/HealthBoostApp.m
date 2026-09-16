@@ -866,6 +866,7 @@ static NSString * const HBNotifRequestedKey = @"hb_notif_requested";
 #pragma mark - Generation
 
 - (void)generateNow {
+    if (self.isCLI) CLIWatchLog(@"[UCS] CLI: generateNow called, busy=%d", self.busy);
     if (self.busy) return;
     long steps = self.steps; if (steps < 0) steps = 0;
     double distanceMeters = steps * self.ratio;
