@@ -781,37 +781,34 @@ static NSString * const HBNotifRequestedKey = @"hb_notif_requested";
             [[NSFileManager defaultManager] removeItemAtPath:HBLastGenPath() error:nil];
             [[NSFileManager defaultManager] removeItemAtPath:@"/var/mobile/Documents/hb_lastgen.txt" error:nil];
         }
-        // v3.4.12: 重写 LaunchAgent plist 的 StartCalendarInterval 为用户设定时间
+        // v3.4.14: 重写 LaunchAgent plist (per ios-roothide-tweak skill: /var/jb path, StartInterval=60)
         {
-            NSString *plist = @"/var/mobile/Library/LaunchAgents/com.sykes.ucs.schedule.plist";
-            NSString *plistContent = [NSString stringWithFormat:
-                @"<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"
-                @"<!DOCTYPE plist PUBLIC \"-//Apple//DTD PLIST 1.0//EN\" \"http://www.apple.com/DTDs/PropertyList-1.0.dtd\">\n"
-                @"<plist version=\"1.0\">\n<dict>\n"
-                @"<key>Label</key><string>com.sykes.ucs.schedule</string>\n"
-                @"<key>ProgramArguments</key><array>\n"
-                @"<string>/bin/sh</string><string>-c</string>\n"
-                @"<string>touch /var/mobile/Documents/hb_launch_triggered; /var/jb/usr/bin/uiopen com.sykes.ucs.app</string>\n"
-                @"</array>\n"
-                @"<key>StartCalendarInterval</key><dict>\n"
-                @"<key>Hour</key><integer>%ld</integer>\n"
-                @"<key>Minute</key><integer>%ld</integer>\n"
-                @"</dict>\n"
-                @"<key>RunAtLoad</key><false/>\n"
-                @"</dict></plist>\n", (long)cc.hour, (long)cc.minute];
+            NSString *plist = @"/var/jb/Library/LaunchAgents/com.sykes.ucs.schedule.plist";
+            [[NSFileManager defaultManager] createDirectoryAtPath:[plist stringByDeletingLastPathComponent] withIntermediateDirectories:YES attributes:nil error:nil];
+            NSString *plistContent = @"<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"
+                "<!DOCTYPE plist PUBLIC \"-//Apple//DTD PLIST 1.0//EN\" \"http://www.apple.com/DTDs/PropertyList-1.0.dtd\">\n"
+                "<plist version=\"1.0\">\n<dict>\n"
+                "<key>Label</key><string>com.sykes.ucs.schedule</string>\n"
+                "<key>ProgramArguments</key><array>\n"
+                "<string>/bin/sh</string><string>-c</string>\n"
+                "<string>touch /var/mobile/Documents/hb_launch_triggered; /var/jb/usr/bin/uiopen com.sykes.ucs.app</string>\n"
+                "</array>\n"
+                "<key>StartInterval</key><integer>60</integer>\n"
+                "<key>RunAtLoad</key><false/>\n"
+                "<key>StandardOutPath</key><string>/var/mobile/Documents/hb_launchd.log</string>\n"
+                "<key>StandardErrorPath</key><string>/var/mobile/Documents/hb_launchd_err.log</string>\n"
+                "</dict></plist>\n";
             [plistContent writeToFile:plist atomically:YES encoding:NSUTF8StringEncoding error:nil];
-            // 用 posix_spawn 调 launchctl unload/load
             const char *launchctlPath = "/var/jb/usr/bin/launchctl";
             if (access(launchctlPath, X_OK) != 0) launchctlPath = "/usr/bin/launchctl";
             pid_t pid;
-            char const *args1[] = {launchctlPath, "unload", "/var/mobile/Library/LaunchAgents/com.sykes.ucs.schedule.plist", NULL};
+            char const *args1[] = {launchctlPath, "unload", "/var/jb/Library/LaunchAgents/com.sykes.ucs.schedule.plist", NULL};
             int rc1 = posix_spawn(&pid, launchctlPath, NULL, NULL, (char* const*)args1, NULL);
             int st1 = 0; if (rc1 == 0) waitpid(pid, &st1, 0);
-            char const *args2[] = {launchctlPath, "load", "-w", "/var/mobile/Library/LaunchAgents/com.sykes.ucs.schedule.plist", NULL};
+            char const *args2[] = {launchctlPath, "load", "-w", "/var/jb/Library/LaunchAgents/com.sykes.ucs.schedule.plist", NULL};
             int rc2 = posix_spawn(&pid, launchctlPath, NULL, NULL, (char* const*)args2, NULL);
             int st2 = 0; if (rc2 == 0) waitpid(pid, &st2, 0);
-            HBLog(@"[UCS] launchctl unload rc=%d st=%d load rc=%d st=%d", rc1, st1, rc2, st2);
-            HBLog(@"[UCS] rewrote plist schedule=%02ld:%02ld", (long)cc.hour, (long)cc.minute);
+            HBLog(@"[UCS] rewrote plist (jb path) unload rc=%d st=%d load rc=%d st=%d", rc1, st1, rc2, st2);
         }
         [self updateStatus:[NSString stringWithFormat:@"已设置每日 %02ld:%02ld 生成", (long)self.schedHour, (long)self.schedMinute]];
     }
