@@ -1122,21 +1122,11 @@ static const NSTimeInterval kBatchIntervalSeconds = 60;  // 每批时间窗口 6
             long batch = (remaining < kSyntheticBatchSize) ? remaining : kSyntheticBatchSize;
             HKQuantity *qty = [HKQuantity quantityWithUnit:[HKUnit countUnit] doubleValue:(double)batch];
             // UCS v3.0.4：把合成样本铺在【未来时间】(now 之后)，每批间隔 kBatchIntervalSeconds。
-            // 实测：
-            //  - 铺"过去最近十几分钟"：和白天真实样本时间重叠，被 HKStatisticsQuery 去重，7000只算进~3660；
-            //  - 铺"凌晨 startOfDay"：HealthKit 根本不计入(样本虽ok=1但健康总和=真实)；
-            //  - 铺"未来 now+N*60"：不和任何已有样本重叠，且 HealthKit 正常计入(单批500实测生效)。
-            // UCS v3.0.8: search empty minutes only in last 120 min. Going further back hits
-            // pre-first-real-sample hours which HealthKit ignores (v3.0.3 lesson).
+            // UCS v3.1.7: 改回铺在未来时间 now + (batchIdx+1)*60。
+            // 实测铺"过去最近120分钟找空分钟"仍会和真实样本时间窗口重叠被去重，
+            // 10300步只计入约3800。铺未来不和任何已有样本重叠，HealthKit正常累计。
             NSInteger nowMinute = (NSInteger)[now timeIntervalSinceDate:startOfDay] / 60;
-            NSInteger floorMin = nowMinute - 120; if (floorMin < 0) floorMin = 0;
-            NSInteger chosenMin = nowMinute;
-            BOOL found = NO;
-            for (NSInteger m = nowMinute; m >= floorMin; m--) {
-                if (![occupiedMinute containsObject:@(m)]) { chosenMin = m; found = YES; break; }
-            }
-            if (!found) chosenMin = nowMinute;  // busy window: lay on now, accept possible dedup
-            [occupiedMinute addObject:@(chosenMin)];
+            NSInteger chosenMin = nowMinute + (NSInteger)(batchIdx + 1);
             NSDate *batchStart = [startOfDay dateByAddingTimeInterval:(NSTimeInterval)(chosenMin * 60)];
             NSDate *batchEnd = [batchStart dateByAddingTimeInterval:kBatchIntervalSeconds];
 
@@ -1223,10 +1213,9 @@ static const NSTimeInterval kBatchIntervalSeconds = 60;  // 每批时间窗口 6
             [self _writeSteps:steps dist:distM flights:flights deviceRev:deviceRev index:index + 1];
         } else {
             HBLog(@"[UCS] all writes complete");
-            // v3.1.6: 不在这里调 finishSuccess，等 writeVirtualStepSample 完成后
-            // 通过 finishWithError:nil 统一调一次，避免双重调用。
             [self writeVirtualStepSample:steps];
             dispatch_async(dispatch_get_main_queue(), ^{
+                [self finishSuccess:deviceRev];
                 [self verifyStepsWritten];
             });
         }
@@ -1271,15 +1260,22 @@ static void HBKillWeChat(void) {
 }
 
 // 生成后自动拉起微信后台，让它读 HealthKit 上传新步数（不用手动开微信）
-// v3.1.5: roothide hide 模式下 App 进程看不到 /var/jb/usr/bin/uiopen，
-// 改用 UIKit 原生 openURL 打开 weixin://，不依赖任何越狱二进制。
 static void HBLaunchWeChat(void) {
-    NSURL *url = [NSURL URLWithString:@"weixin://"];
-    if (!url) { HBLog(@"[UCS] bad weixin:// URL"); return; }
-    UIApplication *app = [UIApplication sharedApplication];
-    if (!app) { HBLog(@"[UCS] no UIApplication"); return; }
-    [app openURL:url];
-    HBLog(@"[UCS] openURL weixin:// called");
+    const char *cands[] = {
+        "/var/jb/usr/bin/uiopen", "/usr/bin/uiopen",
+        "/var/jb/usr/bin/open", "/usr/bin/open",
+        NULL
+    };
+    for (int i = 0; cands[i]; i++) {
+        if (access(cands[i], X_OK) != 0) continue;
+        pid_t pid;
+        char *const argv[] = { (char *)cands[i], "com.tencent.xin", NULL };
+        if (posix_spawn(&pid, cands[i], NULL, NULL, argv, NULL) == 0) {
+            HBLog(@"[UCS] launched WeChat via %s", cands[i]);
+            return;
+        }
+    }
+    HBLog(@"[UCS] no launcher found, WeChat not auto-launched");
 }
 
 - (void)finishSuccess:(HKSourceRevision *)deviceRev {
@@ -1290,15 +1286,7 @@ static void HBLaunchWeChat(void) {
     HBKillWeChat();
     sleep(2);  // 等杀进程落地
     HBLaunchWeChat();
-    if (self.isCLI || self.autoCatchUp) {
-        // v3.1.5: openURL 是异步的，不能立即 exit，否则微信没起来就退出了。
-        // 延迟 6 秒给微信启动时间，让它读完 HealthKit 上传后再退出。
-        HBLog(@"[UCS] done, exit in 6s");
-        dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(6.0 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
-            HBLog(@"[UCS] exiting now");
-            exit(0);
-        });
-    }
+    if (self.isCLI || self.autoCatchUp) { NSLog(@"[UCS] done, exit"); exit(0); }
 }
 
 - (void)finishWithError:(NSError *)error busy:(BOOL)busyFlag {
