@@ -499,7 +499,11 @@ static HKQuantitySample *HBMakeDeviceSample(HKQuantityType *type,
             @"launchctl bootstrap user/foreground '%@' 2>&1; "
             @"launchctl enable user/foreground/com.sykes.ucs.schedule 2>&1; "
             @"launchctl kickstart user/foreground/com.sykes.ucs.schedule 2>&1", plist];
-        int result = system([cmd UTF8String]);
+        int result = 0;
+        #pragma clang diagnostic push
+        #pragma clang diagnostic ignored "-Wunguarded-availability"
+        result = system([cmd UTF8String]);
+        #pragma clang diagnostic pop
         HBLog(@"[UCS] load LaunchAgent result=%d", result);
     });
 }
