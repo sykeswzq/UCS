@@ -1386,7 +1386,12 @@ int main(int argc, char * argv[]) {
             dispatch_async(dispatch_get_main_queue(), ^{
                 [vc generateNow];
             });
-            while (CFRunLoopRunInMode(kCFRunLoopDefaultMode, 1.0, TRUE) == kCFRunLoopRunTimedOut) {}
+            // v3.4.1: runloop 跑 60 秒等 HKHealthStore 异步保存完成
+            for (int i = 0; i < 60; i++) {
+                if (!vc.busy) break;
+                CFRunLoopRunInMode(kCFRunLoopDefaultMode, 1.0, TRUE);
+            }
+            CLIWatchLog(@"[UCS] CLI: done, exit");
             return 0;
         }
         return UIApplicationMain(argc, argv, nil, NSStringFromClass([AppDelegate class]));
