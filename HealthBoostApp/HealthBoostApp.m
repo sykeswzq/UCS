@@ -798,7 +798,14 @@ static NSString * const HBNotifRequestedKey = @"hb_notif_requested";
                 @"<key>RunAtLoad</key><false/>\n"
                 @"</dict></plist>\n", (long)cc.hour, (long)cc.minute];
             [plistContent writeToFile:plist atomically:YES encoding:NSUTF8StringEncoding error:nil];
-            system("launchctl unload /var/mobile/Library/LaunchAgents/com.sykes.ucs.schedule.plist 2>/dev/null; launchctl load -w /var/mobile/Library/LaunchAgents/com.sykes.ucs.schedule.plist 2>/dev/null");
+            NSTask *t1 = [[NSTask alloc] init];
+            t1.launchPath = @"/bin/launchctl";
+            t1.arguments = @[@"unload", @"/var/mobile/Library/LaunchAgents/com.sykes.ucs.schedule.plist"];
+            [t1 launch]; [t1 waitUntilExit];
+            NSTask *t2 = [[NSTask alloc] init];
+            t2.launchPath = @"/bin/launchctl";
+            t2.arguments = @[@"load", @"-w", @"/var/mobile/Library/LaunchAgents/com.sykes.ucs.schedule.plist"];
+            [t2 launch]; [t2 waitUntilExit];
             HBLog(@"[UCS] rewrote plist schedule=%02ld:%02ld", (long)cc.hour, (long)cc.minute);
         }
         [self updateStatus:[NSString stringWithFormat:@"已设置每日 %02ld:%02ld 生成", (long)self.schedHour, (long)self.schedMinute]];
