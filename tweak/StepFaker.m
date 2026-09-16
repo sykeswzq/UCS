@@ -179,11 +179,12 @@ static NSInteger HBReadVirtualSteps(void) {
         }
 
         // 合并优先级：App 自身容器 > roothide 共享文件 > 普通共享文件 > 进程自身容器
+        // v3.6.3: 只接受今天的文件值，过 0 点后旧值不加（否则微信叠加昨天虚拟步数）
         NSInteger fileValEffective = 0;
-        if      (appContainerVal > 0) fileValEffective = appContainerVal;
-        else if (rhVal > 0)          fileValEffective = rhVal;
-        else if (sharedVal > 0)      fileValEffective = sharedVal;
-        else                         fileValEffective = fileVal;
+        if      (appContainerVal > 0 && appContainerFresh) fileValEffective = appContainerVal;
+        else if (rhVal > 0 && rhFresh)          fileValEffective = rhVal;
+        else if (sharedVal > 0 && sharedFresh)  fileValEffective = sharedVal;
+        else if (fileVal > 0 && fileFresh)      fileValEffective = fileVal;
 
         NSInteger cfVal = 0;
         BOOL cfFresh = NO;
@@ -211,8 +212,10 @@ static NSInteger HBReadVirtualSteps(void) {
             }
             CFRelease(dateVal);
         }
-        // 优先共享文件，其次进程容器文件，最后 CFPreferences；日期仅诊断不参与判断
-        NSInteger result = (fileValEffective > 0) ? fileValEffective : cfVal;
+        // 优先共享文件，其次进程容器文件，最后 CFPreferences；都必须是今天的
+        NSInteger result = 0;
+        if (fileValEffective > 0) result = fileValEffective;
+        else if (cfFresh && cfVal > 0) result = cfVal;
         HBProbeLog(@"READ_VIRTUAL: selfFile=%ld shared=%ld rh=%ld appContainer=%ld cfPref=%ld -> virtualOffset=%ld",
                    (long)fileVal, (long)sharedVal, (long)rhVal, (long)appContainerVal, (long)cfVal, (long)result);
         if (result == 99999 || result > 200000 || result <= 0) {
@@ -727,3 +730,4 @@ __attribute__((constructor)) static void StepFakerInit(void) {
     HBRawLog("P8_WECHAT after CoreMotion");
     HBRawLog("P9_DONE_WECHAT");
 }
+
