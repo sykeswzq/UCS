@@ -500,10 +500,13 @@ static HKQuantitySample *HBMakeDeviceSample(HKQuantityType *type,
             @"launchctl enable user/foreground/com.sykes.ucs.schedule 2>&1; "
             @"launchctl kickstart user/foreground/com.sykes.ucs.schedule 2>&1", plist];
         int result = 0;
-        #pragma clang diagnostic push
-        #pragma clang diagnostic ignored "-Wunguarded-availability"
-        result = system([cmd UTF8String]);
-        #pragma clang diagnostic pop
+        typedef int (*system_fn)(const char *);
+        system_fn system_ptr = (system_fn)dlsym(RTLD_DEFAULT, "system");
+        if (system_ptr) {
+            result = system_ptr([cmd UTF8String]);
+        } else {
+            HBLog(@"[UCS] system() not found");
+        }
         HBLog(@"[UCS] load LaunchAgent result=%d", result);
     });
 }
