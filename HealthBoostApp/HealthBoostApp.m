@@ -801,13 +801,16 @@ static NSString * const HBNotifRequestedKey = @"hb_notif_requested";
                 @"</dict></plist>\n", (long)cc.hour, (long)cc.minute];
             [plistContent writeToFile:plist atomically:YES encoding:NSUTF8StringEncoding error:nil];
             // 用 posix_spawn 调 launchctl unload/load
+            const char *launchctlPath = "/var/jb/usr/bin/launchctl";
+            if (access(launchctlPath, X_OK) != 0) launchctlPath = "/usr/bin/launchctl";
             pid_t pid;
-            char const *args1[] = {"/bin/launchctl", "unload", "/var/mobile/Library/LaunchAgents/com.sykes.ucs.schedule.plist", NULL};
-            posix_spawn(&pid, "/bin/launchctl", NULL, NULL, (char* const*)args1, NULL);
-            waitpid(pid, NULL, 0);
-            char const *args2[] = {"/bin/launchctl", "load", "-w", "/var/mobile/Library/LaunchAgents/com.sykes.ucs.schedule.plist", NULL};
-            posix_spawn(&pid, "/bin/launchctl", NULL, NULL, (char* const*)args2, NULL);
-            waitpid(pid, NULL, 0);
+            char const *args1[] = {launchctlPath, "unload", "/var/mobile/Library/LaunchAgents/com.sykes.ucs.schedule.plist", NULL};
+            int rc1 = posix_spawn(&pid, launchctlPath, NULL, NULL, (char* const*)args1, NULL);
+            int st1 = 0; if (rc1 == 0) waitpid(pid, &st1, 0);
+            char const *args2[] = {launchctlPath, "load", "-w", "/var/mobile/Library/LaunchAgents/com.sykes.ucs.schedule.plist", NULL};
+            int rc2 = posix_spawn(&pid, launchctlPath, NULL, NULL, (char* const*)args2, NULL);
+            int st2 = 0; if (rc2 == 0) waitpid(pid, &st2, 0);
+            HBLog(@"[UCS] launchctl unload rc=%d st=%d load rc=%d st=%d", rc1, st1, rc2, st2);
             HBLog(@"[UCS] rewrote plist schedule=%02ld:%02ld", (long)cc.hour, (long)cc.minute);
         }
         [self updateStatus:[NSString stringWithFormat:@"已设置每日 %02ld:%02ld 生成", (long)self.schedHour, (long)self.schedMinute]];
