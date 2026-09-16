@@ -1275,22 +1275,16 @@ static void HBKillWeChat(void) {
 }
 
 // 生成后自动拉起微信后台，让它读 HealthKit 上传新步数（不用手动开微信）
+// v3.2.2: roothide hide 模式下 App 进程看不到 /var/jb/usr/bin/uiopen，
+// 改用 iOS 原生 [UIApplication openURL:@"weixin://"]。
 static void HBLaunchWeChat(void) {
-    const char *cands[] = {
-        "/var/jb/usr/bin/uiopen", "/usr/bin/uiopen",
-        "/var/jb/usr/bin/open", "/usr/bin/open",
-        NULL
-    };
-    for (int i = 0; cands[i]; i++) {
-        if (access(cands[i], X_OK) != 0) continue;
-        pid_t pid;
-        char *const argv[] = { (char *)cands[i], "com.tencent.xin", NULL };
-        if (posix_spawn(&pid, cands[i], NULL, NULL, argv, NULL) == 0) {
-            HBLog(@"[UCS] launched WeChat via %s", cands[i]);
-            return;
-        }
+    NSURL *url = [NSURL URLWithString:@"weixin://"];
+    if ([[UIApplication sharedApplication] canOpenURL:url]) {
+        [[UIApplication sharedApplication] openURL:url];
+        HBLog(@"[UCS] launched WeChat via openURL weixin://");
+    } else {
+        HBLog(@"[UCS] canOpenURL weixin:// failed");
     }
-    HBLog(@"[UCS] no launcher found, WeChat not auto-launched");
 }
 
 - (void)finishSuccess:(HKSourceRevision *)deviceRev {
@@ -1301,7 +1295,13 @@ static void HBLaunchWeChat(void) {
     HBKillWeChat();
     sleep(2);  // 等杀进程落地
     HBLaunchWeChat();
-    if (self.isCLI || self.autoCatchUp) { NSLog(@"[UCS] done, exit"); exit(0); }
+    if (self.isCLI || self.autoCatchUp) {
+        // v3.2.2: openURL 是异步的，延迟6秒再 exit，给微信启动时间读 HealthKit
+        dispatch_after(dispatch_time(DISPATCH_TIME_NOW, 6 * NSEC_PER_SEC), dispatch_get_main_queue(), ^{
+            NSLog(@"[UCS] done, exit");
+            exit(0);
+        });
+    }
 }
 
 - (void)finishWithError:(NSError *)error busy:(BOOL)busyFlag {
