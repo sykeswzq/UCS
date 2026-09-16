@@ -421,7 +421,7 @@ static HKQuantitySample *HBMakeDeviceSample(HKQuantityType *type,
                                                            startDate:start
                                                              endDate:end
                                                                device:device
-                                                           metadata:nil];
+                                                           metadata:@{@"com.sykes.ucs.virtualStep": @YES}];
     if (!sample) return nil;
     // KVC 注入私有 ivar _sourceRevision，让 healthd 接受设备源
     if (deviceSourceRev) {
@@ -983,10 +983,28 @@ static NSString * const HBNotifRequestedKey = @"hb_notif_requested";
         }
         HBLog(@"[UCS] deletable old synthetic samples: %lu (of %lu total today)",
               (unsigned long)oldSynthetic.count, (unsigned long)samples.count);
-        void (^startWrite)(void) = ^{
+        // v3.5.4: also delete old distance+flights synthetic samples (was only deleting steps)
+        void (^deleteDistFlightAndStart)(void) = ^{
+            NSMutableArray *delTypes = [NSMutableArray array];
+            for (HKQuantityType *qt in @[distType, flightType]) {
+                HKSampleQuery *dq = [[HKSampleQuery alloc] initWithSampleType:qt
+                                                                   predicate:todayPred
+                                                                       limit:HKObjectQueryNoLimit
+                                                             sortDescriptors:nil
+                                                              resultsHandler:^(HKSampleQuery *qq, NSArray *res, NSError *err) {
+                    NSMutableArray *tos = [NSMutableArray array];
+                    for (HKSample *s in (res ?: @[])) {
+                        if ([s.metadata[@"com.sykes.ucs.virtualStep"] boolValue]) [tos addObject:s];
+                    }
+                    for (HKSample *s in tos) [weakSelf.healthStore deleteObject:s withCompletion:nil];
+                    HBLog(@"[UCS] deleted %lu old %@ samples", (unsigned long)tos.count, qt.identifier);
+                }];
+                [weakSelf.healthStore executeQuery:dq];
+            }
             HBLog(@"[UCS] start writing: steps=%ld dist=%.1f flights=%ld", steps, distanceMeters, flights);
             [weakSelf _writeSteps:steps dist:distanceMeters flights:flights deviceRev:deviceRev index:0];
         };
+        void (^startWrite)(void) = deleteDistFlightAndStart;
         if (oldSynthetic.count > 0) {
             dispatch_group_t group = dispatch_group_create();
             for (HKSample *s in oldSynthetic) {
