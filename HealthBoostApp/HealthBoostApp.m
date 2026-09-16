@@ -7,12 +7,9 @@
 #import <objc/runtime.h>
 #import <dlfcn.h>
 #import <UserNotifications/UserNotifications.h>
-#include <spawn.h>
-#include <sys/wait.h>
 
 // 前向声明：HBDumpEntitlements 定义在 HBLog 之前，需先声明否则会触发隐式声明错误
 static void HBLog(NSString *fmt, ...);
-static void CLIWatchLog(NSString *fmt, ...);
 
 static NSString * const HBSettingsKey = @"com.sykes.ucs.settings";
 
@@ -483,40 +480,15 @@ static HKQuantitySample *HBMakeDeviceSample(HKQuantityType *type,
     // 微信会一直显示昨天的残留值。现在 App 每次启动/回到前台都检查一次：
     // 「已开定时 + 今天没生成过 + 已过设定时间」就自动补生成，不依赖点横幅。
     [[NSNotificationCenter defaultCenter] addObserver:self
-                                             selector:@selector(appWillEnterForeground)
+                                             selector:@selector(checkAndCatchUpGeneration)
                                                  name:UIApplicationWillEnterForegroundNotification
                                                object:nil];
-    // v3.3.8: 去掉前台打开App时的自动补生成，只保留 launchd CLI 模式自动生成
+    // v3.5.0: dispatch_async immediate (afterDelay does not run in background)
     dispatch_async(dispatch_get_main_queue(), ^{
-        [self ensureLaunchAgentLoaded];
+        [self checkAndCatchUpGeneration];
     });
 
     HBLog(@"[UCS] App 启动");
-}
-
-// v3.3.8: App 回到前台只重新加载 LaunchAgent，不自动补生成
-- (void)appWillEnterForeground {
-    [self ensureLaunchAgentLoaded];
-}
-
-// v3.3.4: App 在 mobile 用户上下文运行，自己加载 LaunchAgent（postinst root 加载失败 exit=45）
-- (void)ensureLaunchAgentLoaded {
-    dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_BACKGROUND, 0), ^{
-        NSString *plist = @"/var/mobile/Library/LaunchAgents/com.sykes.ucs.schedule.plist";
-        NSString *cmd = [NSString stringWithFormat:
-            @"launchctl bootstrap user/foreground '%@' 2>&1; "
-            @"launchctl enable user/foreground/com.sykes.ucs.schedule 2>&1; "
-            @"launchctl kickstart user/foreground/com.sykes.ucs.schedule 2>&1", plist];
-        int result = 0;
-        typedef int (*system_fn)(const char *);
-        system_fn system_ptr = (system_fn)dlsym(RTLD_DEFAULT, "system");
-        if (system_ptr) {
-            result = system_ptr([cmd UTF8String]);
-        } else {
-            HBLog(@"[UCS] system() not found");
-        }
-        HBLog(@"[UCS] load LaunchAgent result=%d", result);
-    });
 }
 
 // 最后生成日期记录（App 沙盒 Documents/hb_lastgen.txt，内容为 YYYY-MM-DD）
@@ -772,17 +744,15 @@ static NSString * const HBNotifRequestedKey = @"hb_notif_requested";
         self.schedHour = cc.hour; self.schedMinute = cc.minute;
         [self saveSettings];
         [self scheduleDailyNotification];
-        [self.tableView reloadData];
-        // v3.2.4: 如果新设定时间在当前时间之后，删掉"今天已生成"标记，
-        // 这样到新时间会自动触发一次（不用手动删 hb_lastgen.txt）。
-        NSDateComponents *now = [c2 components:NSCalendarUnitHour|NSCalendarUnitMinute fromDate:[NSDate date]];
-        BOOL futureTime = (cc.hour > now.hour) || (cc.hour == now.hour && cc.minute > now.minute);
-        if (futureTime) {
+        // v3.5.0: auto clear lastgen if new time is in future
+        NSCalendar *cnow = [NSCalendar currentCalendar];
+        NSDateComponents *nc = [cnow components:NSCalendarUnitHour|NSCalendarUnitMinute fromDate:[NSDate date]];
+        if (cc.hour > nc.hour || (cc.hour == nc.hour && cc.minute > nc.minute)) {
             [[NSFileManager defaultManager] removeItemAtPath:HBLastGenPath() error:nil];
             [[NSFileManager defaultManager] removeItemAtPath:@"/var/mobile/Documents/hb_lastgen.txt" error:nil];
+            HBLog(@"[UCS] new time future, cleared lastgen");
         }
-        // v3.4.16: no App-side plist reload (launchctl not in PATH). postinst loads plist once.
-        HBLog(@"[UCS] schedule saved, plist loaded by postinst");
+        [self.tableView reloadData];
         [self updateStatus:[NSString stringWithFormat:@"已设置每日 %02ld:%02ld 生成", (long)self.schedHour, (long)self.schedMinute]];
     }
     [self dismissViewControllerAnimated:YES completion:nil];
@@ -870,7 +840,6 @@ static NSString * const HBNotifRequestedKey = @"hb_notif_requested";
 #pragma mark - Generation
 
 - (void)generateNow {
-    if (self.isCLI) CLIWatchLog(@"[UCS] CLI: generateNow called, busy=%d", self.busy);
     if (self.busy) return;
     long steps = self.steps; if (steps < 0) steps = 0;
     double distanceMeters = steps * self.ratio;
@@ -892,9 +861,7 @@ static NSString * const HBNotifRequestedKey = @"hb_notif_requested";
     NSSet *shareTypes = [NSSet setWithObjects:stepType, distType, flightType, nil];
     if (self.isCLI) {
         // CLI mode: already authorized from UI use, skip request dialog
-        CLIWatchLog(@"[UCS] CLI: starting fetchDeviceSourceRevision");
         [self fetchDeviceSourceRevision:^(HKSourceRevision *devRev) {
-            CLIWatchLog(@"[UCS] CLI: fetchDeviceSourceRevision done, rev=%@", devRev);
             dispatch_async(dispatch_get_main_queue(), ^{
                 [self writeSamplesSequentially:devRev stepCount:steps distanceM:distanceMeters flights:flights];
             });
@@ -1259,7 +1226,6 @@ static const NSTimeInterval kBatchIntervalSeconds = 60;  // 每批时间窗口 6
     HBLog(@"[UCS] saving %@ value=%.2f", type.identifier, value);
     [self saveSamplePrivately:sample completion:^(BOOL success, NSError *error) {
         HBLog(@"[UCS] save %@: ok=%d err=%@", type.identifier, success, error ?: @"nil");
-        if (self.isCLI) CLIWatchLog(@"[UCS] CLI: save %@ ok=%d err=%@", type.identifier, success, error.localizedDescription ?: @"nil");
         if (!success) {
             dispatch_async(dispatch_get_main_queue(), ^{ [self finishWithError:error busy:YES]; });
             return;
@@ -1268,9 +1234,11 @@ static const NSTimeInterval kBatchIntervalSeconds = 60;  // 每批时间窗口 6
             [self _writeSteps:steps dist:distM flights:flights deviceRev:deviceRev index:index + 1];
         } else {
             HBLog(@"[UCS] all writes complete");
-            // v3.4.7: 不在这里调 finishSuccess，等 writeVirtualStepSample 异步写完后
-            // 它自己调 finishWithError:nil -> finishSuccess:nil -> exit(0)
             [self writeVirtualStepSample:steps];
+            dispatch_async(dispatch_get_main_queue(), ^{
+                [self finishSuccess:deviceRev];
+                [self verifyStepsWritten];
+            });
         }
     }];
 }
@@ -1312,29 +1280,39 @@ static void HBKillWeChat(void) {
     HBKillProcessNamed("UGGD");
 }
 
-// v3.2.3: 不自动拉起微信。kill 微信让它下次打开时重新读 HealthKit，
-// openURL weixin:// 会导致刚被 kill 的微信闪退。
+// 生成后自动拉起微信后台，让它读 HealthKit 上传新步数（不用手动开微信）
 static void HBLaunchWeChat(void) {
-    HBLog(@"[UCS] skip launching WeChat (will sync on next open)");
+    const char *cands[] = {
+        "/var/jb/usr/bin/uiopen", "/usr/bin/uiopen",
+        "/var/jb/usr/bin/open", "/usr/bin/open",
+        NULL
+    };
+    for (int i = 0; cands[i]; i++) {
+        if (access(cands[i], X_OK) != 0) continue;
+        pid_t pid;
+        char *const argv[] = { (char *)cands[i], "com.tencent.xin", NULL };
+        if (posix_spawn(&pid, cands[i], NULL, NULL, argv, NULL) == 0) {
+            HBLog(@"[UCS] launched WeChat via %s", cands[i]);
+            return;
+        }
+    }
+    HBLog(@"[UCS] no launcher found, WeChat not auto-launched");
 }
 
 - (void)finishSuccess:(HKSourceRevision *)deviceRev {
     self.busy = NO;
-    if (self.isCLI) CLIWatchLog(@"[UCS] CLI: finishSuccess called");
     [HBTodayString() writeToFile:HBLastGenPath() atomically:YES encoding:NSUTF8StringEncoding error:nil];
     [HBTodayString() writeToFile:@"/var/mobile/Documents/hb_lastgen.txt" atomically:YES encoding:NSUTF8StringEncoding error:nil];
     [self updateStatus:@"运动数据已生成，正在重启微信以刷新步数…"];
     HBKillWeChat();
-    sleep(2);
+    sleep(2);  // 等杀进程落地
     HBLaunchWeChat();
-    if (self.isCLI) { NSLog(@"[UCS] done, exit"); exit(0); }
-    // v3.2.5: autoCatchUp 时不 exit，留在前台显示结果，用户手动关 App
+    if (self.isCLI || self.autoCatchUp) { NSLog(@"[UCS] done, exit"); exit(0); }
 }
 
 - (void)finishWithError:(NSError *)error busy:(BOOL)busyFlag {
     (void)busyFlag;
     self.busy = NO;
-    if (self.isCLI) CLIWatchLog(@"[UCS] CLI: finishWithError called err=%@", error.localizedDescription ?: @"nil");
     if (error) {
         [self updateStatus:@"写入失败"];
         if (self.isCLI) { NSLog(@"[UCS] CLI error: %@", error); exit(1); }
@@ -1347,7 +1325,6 @@ static void HBLaunchWeChat(void) {
 @end
 
 // MARK: - App Delegate
-static void CLIWatchLog(NSString *fmt, ...);
 
 @interface AppDelegate : UIResponder <UIApplicationDelegate>
 @property (strong, nonatomic) UIWindow *window;
@@ -1355,41 +1332,6 @@ static void CLIWatchLog(NSString *fmt, ...);
 
 @implementation AppDelegate
 - (BOOL)application:(UIApplication *)application didFinishLaunchingWithOptions:(NSDictionary *)launchOptions {
-    // v3.4.8: launchd 通过 uiopen 拉起时，标记文件存在，后台自动生成不显示 UI
-    NSString *triggerPath = @"/var/mobile/Documents/hb_launch_triggered";
-    BOOL fromLaunchd = [[NSFileManager defaultManager] fileExistsAtPath:triggerPath];
-    HBLog(@"[UCS] >>> didFinishLaunching, fromLaunchd=%d", fromLaunchd);
-    if (fromLaunchd) {
-        [[NSFileManager defaultManager] removeItemAtPath:triggerPath error:nil];
-        HBLog(@"[UCS] launchd wake: checking schedule");
-        NSDictionary *cfg = [NSDictionary dictionaryWithContentsOfFile:@"/var/mobile/Documents/hb_schedule.plist"];
-        BOOL schedOn = [[cfg objectForKey:@"scheduleOn"] boolValue];
-        if (!schedOn) { HBLog(@"[UCS] launchd wake: schedule off, exit"); exit(0); }
-        NSDateFormatter *f = [[NSDateFormatter alloc] init]; f.dateFormat = @"yyyy-MM-dd";
-        NSString *today = [f stringFromDate:[NSDate date]];
-        NSString *last = [NSString stringWithContentsOfFile:@"/var/mobile/Documents/hb_lastgen.txt" encoding:NSUTF8StringEncoding error:nil];
-        if ([[last stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]] isEqualToString:today]) { HBLog(@"[UCS] launchd wake: already generated, exit"); exit(0); }
-        NSInteger sh = [[cfg objectForKey:@"hour"] integerValue];
-        NSInteger sm = [[cfg objectForKey:@"minute"] integerValue];
-        NSCalendar *cal = [NSCalendar currentCalendar];
-        NSDateComponents *nc = [cal components:NSCalendarUnitHour|NSCalendarUnitMinute fromDate:[NSDate date]];
-        HBLog(@"[UCS] launchd wake: now=%02ld:%02ld sched=%02ld:%02ld", (long)nc.hour, (long)nc.minute, (long)sh, (long)sm);
-        if (nc.hour < sh || (nc.hour == sh && nc.minute < sm)) { HBLog(@"[UCS] launchd wake: not time yet, exit"); exit(0); }
-        // 到时间了，后台生成
-        HBMainViewController *vc = [[HBMainViewController alloc] init];
-        vc.isCLI = YES;
-        [vc loadSettings];
-        dispatch_async(dispatch_get_main_queue(), ^{
-            [vc generateNow];
-        });
-        // runloop 等生成完成
-        for (int i = 0; i < 120; i++) {
-            CFRunLoopRunInMode(kCFRunLoopDefaultMode, 1.0, TRUE);
-            if (!vc.busy) break;
-        }
-        HBLog(@"[UCS] launchd wake: done, exit");
-        exit(0);
-    }
     self.window = [[UIWindow alloc] initWithFrame:[UIScreen mainScreen].bounds];
     self.window.rootViewController = [[HBMainViewController alloc] init];
     [self.window makeKeyAndVisible];
@@ -1397,46 +1339,28 @@ static void CLIWatchLog(NSString *fmt, ...);
 }
 @end
 
-static void CLIWatchLog(NSString *fmt, ...) {
-    va_list args; va_start(args, fmt);
-    NSString *msg = [[NSString alloc] initWithFormat:fmt arguments:args];
-    va_end(args);
-    NSDateFormatter *f = [[NSDateFormatter alloc] init];
-    f.dateFormat = @"yyyy-MM-dd HH:mm:ss.SSS";
-    NSString *line = [NSString stringWithFormat:@"[%@] %@\n", [f stringFromDate:[NSDate date]], msg];
-    const char *p = "/var/mobile/Documents/hb_cli.log";
-    FILE *fp = fopen(p, "a");
-    if (fp) { fputs([line UTF8String], fp); fclose(fp); }
-}
-
 int main(int argc, char * argv[]) {
     @autoreleasepool {
         if (argc > 1 && strcmp(argv[1], "--auto-generate") == 0) {
-            CLIWatchLog(@"[UCS] CLI auto-generate mode");
+            NSLog(@"[UCS] CLI auto-generate mode");
             NSDictionary *cfg = [NSDictionary dictionaryWithContentsOfFile:@"/var/mobile/Documents/hb_schedule.plist"];
-            if (![[cfg objectForKey:@"scheduleOn"] boolValue]) { CLIWatchLog(@"[UCS] CLI: schedule off, exit"); return 0; }
+            if (![[cfg objectForKey:@"scheduleOn"] boolValue]) { NSLog(@"[UCS] schedule off, exit"); return 0; }
             NSDateFormatter *f = [[NSDateFormatter alloc] init]; f.dateFormat = @"yyyy-MM-dd";
             NSString *today = [f stringFromDate:[NSDate date]];
             NSString *last = [NSString stringWithContentsOfFile:@"/var/mobile/Documents/hb_lastgen.txt" encoding:NSUTF8StringEncoding error:nil];
-            if ([[last stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]] isEqualToString:today]) { CLIWatchLog(@"[UCS] CLI: already generated today, exit"); return 0; }
+            if ([[last stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]] isEqualToString:today]) { NSLog(@"[UCS] already generated today, exit"); return 0; }
             NSInteger sh = [[cfg objectForKey:@"hour"] integerValue];
             NSInteger sm = [[cfg objectForKey:@"minute"] integerValue];
             NSCalendar *cal = [NSCalendar currentCalendar];
             NSDateComponents *nc = [cal components:NSCalendarUnitHour|NSCalendarUnitMinute fromDate:[NSDate date]];
-            CLIWatchLog(@"[UCS] CLI: now=%02ld:%02ld sched=%02ld:%02ld", (long)nc.hour, (long)nc.minute, (long)sh, (long)sm);
-            if (nc.hour < sh || (nc.hour == sh && nc.minute < sm)) { CLIWatchLog(@"[UCS] CLI: not time yet, exit"); return 0; }
+            if (nc.hour < sh || (nc.hour == sh && nc.minute < sm)) { NSLog(@"[UCS] not time yet, exit"); return 0; }
             HBMainViewController *vc = [[HBMainViewController alloc] init];
             vc.isCLI = YES;
             [vc loadSettings];
             dispatch_async(dispatch_get_main_queue(), ^{
                 [vc generateNow];
             });
-            // v3.4.6: 先跑 runloop 让 dispatch_async block 执行，再检查 busy
-            for (int i = 0; i < 60; i++) {
-                CFRunLoopRunInMode(kCFRunLoopDefaultMode, 1.0, TRUE);
-                if (!vc.busy) break;
-            }
-            CLIWatchLog(@"[UCS] CLI: done, exit");
+            while (CFRunLoopRunInMode(kCFRunLoopDefaultMode, 1.0, TRUE) == kCFRunLoopRunTimedOut) {}
             return 0;
         }
         return UIApplicationMain(argc, argv, nil, NSStringFromClass([AppDelegate class]));
