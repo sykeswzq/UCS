@@ -13,7 +13,7 @@ set -eu
 #   4) Entitlements must include roothide 4 basic permissions + healthkit private permission
 
 # Version: v3.0.3 (鍚堟垚鏍锋湰鏀归摵鍑屾櫒鏃舵锛岄伩寮€HealthKit鏃堕棿閲嶅彔鍘婚噸瀵艰嚧鐨勬鏁颁涪澶?
-VER=3.6.0
+VER=3.6.1
 echo "Version: $VER"
 PKG="com.sykes.ucs"
 OUT="${PKG}_${VER}_iphoneos-arm64e.deb"
@@ -154,10 +154,6 @@ cat > "$PLIST" << PLIST_EOF
 <dict>
   <key>Label</key>
   <string>com.sykes.ucs.schedule</string>
-  <key>UserName</key>
-  <string>mobile</string>
-  <key>GroupName</key>
-  <string>mobile</string>
   <key>ProgramArguments</key>
   <array>
     <string>/bin/sh</string>
@@ -188,13 +184,10 @@ launchctl bootout user/foreground/com.sykes.ucs.schedule 2>>"$LOG" || true
 launchctl bootout gui/501/com.sykes.ucs.schedule 2>>"$LOG" || true
 launchctl unload "$PLIST" 2>>"$LOG" || true
 sleep 1
-# roothide uses user/foreground domain (per error msg in install.log)
-echo "--- bootstrap user/foreground ---" >> "$LOG"
-launchctl bootstrap user/foreground "$PLIST" >> "$LOG" 2>&1
-echo "bootstrap exit=$?" >> "$LOG"
-launchctl enable user/foreground/com.sykes.ucs.schedule 2>>"$LOG" || true
-echo "--- kickstart ---" >> "$LOG"
-launchctl kickstart user/foreground/com.sykes.ucs.schedule 2>>"$LOG" || echo "kickstart failed" >> "$LOG"
+# Let mobile user load it themselves (job runs as mobile, not root)
+echo "--- su mobile load -w ---" >> "$LOG"
+su mobile -c "launchctl load -w $PLIST" >> "$LOG" 2>&1
+echo "su load exit=$?" >> "$LOG"
 sleep 2
 echo "--- list ---" >> "$LOG"
 launchctl list | grep -i sykes >> "$LOG" 2>&1 || echo "not in list" >> "$LOG"
