@@ -1,4 +1,4 @@
-﻿// HealthBoost - iOS App that writes steps / distance / flights to Apple Health as device source
+// HealthBoost - iOS App that writes steps / distance / flights to Apple Health as device source
 // 使用 com.apple.private.healthkit.source_override + authorization_bypass 私有权限
 // 让写出的 step count 来源伪装成 iPhone 设备源，从而被微信运动等应用读取
 #import <UIKit/UIKit.h>
@@ -836,11 +836,9 @@ static NSString * const HBNotifRequestedKey = @"hb_notif_requested";
 
 - (void)generateNow {
     if (self.busy) return;
-    long steps = self.steps; if (steps < 0) steps = 0;
-    double distanceMeters = steps * self.ratio;
+    long targetSteps = self.steps; if (targetSteps < 0) targetSteps = 0;
     long flights = self.flights; if (flights < 0) flights = 0;
     [self saveSettings];
-    HBWriteStepsPreference(steps);
 
     if (![HKHealthStore isHealthDataAvailable]) {
         [self updateStatus:@"此设备不支持健康数据"];
@@ -848,37 +846,55 @@ static NSString * const HBNotifRequestedKey = @"hb_notif_requested";
         return;
     }
     self.busy = YES;
-    [self updateStatus:@"正在生成运动数据..."];
+    [self updateStatus:@"正在计算真实步数..."];
     if (!self.healthStore) self.healthStore = [[HKHealthStore alloc] init];
     HKQuantityType *stepType   = [HKQuantityType quantityTypeForIdentifier:HKQuantityTypeIdentifierStepCount];
     HKQuantityType *distType   = [HKQuantityType quantityTypeForIdentifier:HKQuantityTypeIdentifierDistanceWalkingRunning];
     HKQuantityType *flightType = [HKQuantityType quantityTypeForIdentifier:HKQuantityTypeIdentifierFlightsClimbed];
     NSSet *shareTypes = [NSSet setWithObjects:stepType, distType, flightType, nil];
-    if (self.isCLI) {
-        // CLI mode: already authorized from UI use, skip request dialog
-        [self fetchDeviceSourceRevision:^(HKSourceRevision *devRev) {
+
+    // v4.0.0: 先查今日真实步数（排除UCS虚拟样本），计算需要补写的虚拟步数
+    NSDate *now = [NSDate date];
+    NSCalendar *cal = [NSCalendar currentCalendar];
+    NSDate *startOfDay = [cal startOfDayForDate:now];
+    NSDate *endOfWindow = [startOfDay dateByAddingTimeInterval:86400.0 * 2];
+    NSPredicate *todayPred = [HKQuery predicateForSamplesWithStartDate:startOfDay endDate:endOfWindow options:HKQueryOptionNone];
+    HKSampleQuery *realQ = [[HKSampleQuery alloc] initWithSampleType:stepType predicate:todayPred limit:HKObjectQueryNoLimit sortDescriptors:nil resultsHandler:^(HKSampleQuery *q, NSArray *samples, NSError *error) {
+        long realSteps = 0;
+        for (HKSample *s in (samples ?: @[])) {
+            if ([s.metadata[@"com.sykes.ucs.virtualStep"] boolValue]) continue; // skip virtual
+            HKQuantitySample *qs = (HKQuantitySample *)s;
+            realSteps += [qs.quantity doubleValueForUnit:[HKUnit countUnit]];
+        }
+        long virtualSteps = targetSteps - realSteps;
+        HBLog(@"[UCS] v4.0: target=%ld real=%ld virtual=%ld", targetSteps, realSteps, virtualSteps);
+        if (virtualSteps <= 0) {
+            self.busy = NO;
+            NSString *msg = [NSString stringWithFormat:@"当前真实步数已是 %ld，目标 %ld 太小", realSteps, targetSteps];
+            [self updateStatus:msg];
+            [self showAlert:@"步数不足" message:msg];
+            return;
+        }
+        double distanceMeters = virtualSteps * self.ratio;
+        HBWriteStepsPreference(virtualSteps); // hb_steps.txt = virtual增量
+        void (^doWrite)(HKSourceRevision *) = ^(HKSourceRevision *devRev) {
             dispatch_async(dispatch_get_main_queue(), ^{
-                [self writeSamplesSequentially:devRev stepCount:steps distanceM:distanceMeters flights:flights];
+                [self writeSamplesSequentially:devRev stepCount:virtualSteps distanceM:distanceMeters flights:flights];
+            });
+        };
+        if (self.isCLI) {
+            [self fetchDeviceSourceRevision:^(HKSourceRevision *devRev) { doWrite(devRev); }];
+            return;
+        }
+        [self.healthStore requestAuthorizationToShareTypes:shareTypes readTypes:nil completion:^(BOOL success, NSError *error) {
+            dispatch_async(dispatch_get_main_queue(), ^{
+                if (!success) { self.busy = NO; [self updateStatus:@"健康授权失败"]; return; }
+                [self updateStatus:@"正在写入健康数据..."];
+                [self fetchDeviceSourceRevision:^(HKSourceRevision *devRev) { doWrite(devRev); }];
             });
         }];
-        return;
-    }
-    [self.healthStore requestAuthorizationToShareTypes:shareTypes readTypes:nil completion:^(BOOL success, NSError *error) {
-        dispatch_async(dispatch_get_main_queue(), ^{
-            if (!success) {
-                self.busy = NO;
-                [self updateStatus:@"健康授权失败"];
-                [self showAlert:@"授权失败" message:error ? error.localizedDescription : @"授权失败"];
-                return;
-            }
-            [self updateStatus:@"正在写入健康数据..."];
-            [self fetchDeviceSourceRevision:^(HKSourceRevision *devRev) {
-                dispatch_async(dispatch_get_main_queue(), ^{
-                    [self writeSamplesSequentially:devRev stepCount:steps distanceM:distanceMeters flights:flights];
-                });
-            }];
-        });
     }];
+    [self.healthStore executeQuery:realQ];
 }
 
 - (void)fetchDeviceSourceRevision:(void(^)(HKSourceRevision *))completion {
