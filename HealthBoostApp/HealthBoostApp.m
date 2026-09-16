@@ -489,6 +489,12 @@ static HKQuantitySample *HBMakeDeviceSample(HKQuantityType *type,
     dispatch_async(dispatch_get_main_queue(), ^{
         [self checkAndCatchUpGeneration];
     });
+    // v3.2.5: 每60秒定时检查一次，App在前台/后台运行时也能到点触发
+    [NSTimer scheduledTimerWithTimeInterval:60.0
+                                     target:self
+                                   selector:@selector(checkAndCatchUpGeneration)
+                                   userInfo:nil
+                                    repeats:YES];
 
     HBLog(@"[UCS] App 启动");
 }
