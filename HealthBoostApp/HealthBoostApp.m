@@ -483,21 +483,17 @@ static HKQuantitySample *HBMakeDeviceSample(HKQuantityType *type,
                                              selector:@selector(appWillEnterForeground)
                                                  name:UIApplicationWillEnterForegroundNotification
                                                object:nil];
-    // v3.2.0: launchd 在锁屏/关App状态下 uiopen 启动后，App 进入后台，
-    // afterDelay:1.0 的 performSelector 可能不被 runloop 执行。
-    // 改为 dispatch_async 到下一个 runloop（不延迟但异步，避免 viewDidLoad 同步崩溃）。
+    // v3.3.8: 去掉前台打开App时的自动补生成，只保留 launchd CLI 模式自动生成
     dispatch_async(dispatch_get_main_queue(), ^{
-        [self checkAndCatchUpGeneration];
+        [self ensureLaunchAgentLoaded];
     });
 
     HBLog(@"[UCS] App 启动");
-    [self ensureLaunchAgentLoaded];
 }
 
-// v3.3.4: App 回到前台时重新加载 LaunchAgent（防止被系统禁用）并检查补生成
+// v3.3.8: App 回到前台只重新加载 LaunchAgent，不自动补生成
 - (void)appWillEnterForeground {
     [self ensureLaunchAgentLoaded];
-    [self checkAndCatchUpGeneration];
 }
 
 // v3.3.4: App 在 mobile 用户上下文运行，自己加载 LaunchAgent（postinst root 加载失败 exit=45）
