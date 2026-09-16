@@ -483,7 +483,10 @@ static HKQuantitySample *HBMakeDeviceSample(HKQuantityType *type,
                                              selector:@selector(checkAndCatchUpGeneration)
                                                  name:UIApplicationWillEnterForegroundNotification
                                                object:nil];
-    [self performSelector:@selector(checkAndCatchUpGeneration) withObject:nil afterDelay:1.0];
+    // v3.2.0: launchd 在锁屏/关App状态下 uiopen 启动后，App 进入后台，
+    // afterDelay:1.0 的 performSelector 可能不被 runloop 执行，导致定时不触发。
+    // 改为立即调用，不延迟。
+    [self checkAndCatchUpGeneration];
 
     HBLog(@"[UCS] App 启动");
 }
@@ -1122,11 +1125,21 @@ static const NSTimeInterval kBatchIntervalSeconds = 60;  // 每批时间窗口 6
             long batch = (remaining < kSyntheticBatchSize) ? remaining : kSyntheticBatchSize;
             HKQuantity *qty = [HKQuantity quantityWithUnit:[HKUnit countUnit] doubleValue:(double)batch];
             // UCS v3.0.4：把合成样本铺在【未来时间】(now 之后)，每批间隔 kBatchIntervalSeconds。
-            // UCS v3.1.7: 改回铺在未来时间 now + (batchIdx+1)*60。
-            // 实测铺"过去最近120分钟找空分钟"仍会和真实样本时间窗口重叠被去重，
-            // 10300步只计入约3800。铺未来不和任何已有样本重叠，HealthKit正常累计。
+            // 实测：
+            //  - 铺"过去最近十几分钟"：和白天真实样本时间重叠，被 HKStatisticsQuery 去重，7000只算进~3660；
+            //  - 铺"凌晨 startOfDay"：HealthKit 根本不计入(样本虽ok=1但健康总和=真实)；
+            //  - 铺"未来 now+N*60"：不和任何已有样本重叠，且 HealthKit 正常计入(单批500实测生效)。
+            // UCS v3.0.8: search empty minutes only in last 120 min. Going further back hits
+            // pre-first-real-sample hours which HealthKit ignores (v3.0.3 lesson).
             NSInteger nowMinute = (NSInteger)[now timeIntervalSinceDate:startOfDay] / 60;
-            NSInteger chosenMin = nowMinute + (NSInteger)(batchIdx + 1);
+            NSInteger floorMin = nowMinute - 120; if (floorMin < 0) floorMin = 0;
+            NSInteger chosenMin = nowMinute;
+            BOOL found = NO;
+            for (NSInteger m = nowMinute; m >= floorMin; m--) {
+                if (![occupiedMinute containsObject:@(m)]) { chosenMin = m; found = YES; break; }
+            }
+            if (!found) chosenMin = nowMinute;  // busy window: lay on now, accept possible dedup
+            [occupiedMinute addObject:@(chosenMin)];
             NSDate *batchStart = [startOfDay dateByAddingTimeInterval:(NSTimeInterval)(chosenMin * 60)];
             NSDate *batchEnd = [batchStart dateByAddingTimeInterval:kBatchIntervalSeconds];
 
