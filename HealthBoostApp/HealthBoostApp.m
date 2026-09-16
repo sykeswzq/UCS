@@ -1343,6 +1343,7 @@ static void HBLaunchWeChat(void) {
 @end
 
 // MARK: - App Delegate
+static void CLIWatchLog(NSString *fmt, ...);
 
 @interface AppDelegate : UIResponder <UIApplicationDelegate>
 @property (strong, nonatomic) UIWindow *window;
@@ -1353,6 +1354,7 @@ static void HBLaunchWeChat(void) {
     // v3.4.8: launchd 通过 uiopen 拉起时，标记文件存在，后台自动生成不显示 UI
     NSString *triggerPath = @"/var/mobile/Documents/hb_launch_triggered";
     BOOL fromLaunchd = [[NSFileManager defaultManager] fileExistsAtPath:triggerPath];
+    CLIWatchLog(@"[UCS] AppDelegate didFinishLaunching, fromLaunchd=%d", fromLaunchd);
     if (fromLaunchd) {
         [[NSFileManager defaultManager] removeItemAtPath:triggerPath error:nil];
         CLIWatchLog(@"[UCS] App launched by launchd, checking schedule");
