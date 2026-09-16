@@ -13,7 +13,7 @@ set -eu
 #   4) Entitlements must include roothide 4 basic permissions + healthkit private permission
 
 # Version: v3.0.3 (鍚堟垚鏍锋湰鏀归摵鍑屾櫒鏃舵锛岄伩寮€HealthKit鏃堕棿閲嶅彔鍘婚噸瀵艰嚧鐨勬鏁颁涪澶?
-VER=3.3.2
+VER=3.3.3
 echo "Version: $VER"
 PKG="com.sykes.ucs"
 OUT="${PKG}_${VER}_iphoneos-arm64e.deb"
@@ -181,27 +181,8 @@ echo "PLIST=$PLIST" >> "$LOG"
 ls -la "$PLIST" >> "$LOG" 2>&1
 echo "APP exists:" >> "$LOG"
 ls -la "$APP" >> "$LOG" 2>&1
-# Unload old (both system and user domains)
-launchctl asuser 501 launchctl bootout user/foreground/com.sykes.ucs.schedule 2>>"$LOG" || true
-launchctl bootout system/com.sykes.ucs.schedule 2>>"$LOG" || true
-launchctl asuser 501 launchctl unload "$PLIST" 2>>"$LOG" || true
-# Enable and load into user/foreground domain
-launchctl asuser 501 launchctl enable user/foreground/com.sykes.ucs.schedule 2>>"$LOG" || true
-echo "--- bootstrap ---" >> "$LOG"
-launchctl asuser 501 launchctl bootstrap user/foreground "$PLIST" >> "$LOG" 2>&1
-echo "bootstrap exit=$?" >> "$LOG"
-if [ $? -ne 0 ]; then
-  echo "bootstrap failed, trying load" >> "$LOG"
-  launchctl asuser 501 launchctl load "$PLIST" >> "$LOG" 2>&1
-  echo "load exit=$?" >> "$LOG"
-fi
-echo "--- print ---" >> "$LOG"
-launchctl asuser 501 launchctl print user/foreground/com.sykes.ucs.schedule >> "$LOG" 2>&1
-echo "print exit=$?" >> "$LOG"
-# Test run immediately
-echo "--- kickstart test ---" >> "$LOG"
-launchctl asuser 501 launchctl kickstart user/foreground/com.sykes.ucs.schedule >> "$LOG" 2>&1
-echo "kickstart exit=$?" >> "$LOG"
+# v3.3.3: postinst 不加载 LaunchAgent（root 权限不足），App 启动时自己加载
+echo "plist written to $PLIST, will be loaded by App on first launch" >> "$LOG"
 echo "=== done ===" >> "$LOG"
 # Force kill WeChat
 for k in /var/jb/bin/killall /usr/bin/killall killall; do
