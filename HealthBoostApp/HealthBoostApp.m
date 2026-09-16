@@ -1352,22 +1352,34 @@ static void HBLaunchWeChat(void) {
 }
 @end
 
+static void CLIWatchLog(NSString *fmt, ...) {
+    va_list args; va_start(args, fmt);
+    NSString *msg = [[NSString alloc] initWithFormat:fmt arguments:args];
+    va_end(args);
+    NSDateFormatter *f = [[NSDateFormatter alloc] init];
+    f.dateFormat = @"yyyy-MM-dd HH:mm:ss.SSS";
+    NSString *line = [NSString stringWithFormat:@"[%@] %@\n", [f stringFromDate:[NSDate date]], msg];
+    const char *p = "/var/mobile/Documents/hb_cli.log";
+    FILE *fp = fopen(p, "a");
+    if (fp) { fputs([line UTF8String], fp); fclose(fp); }
+}
+
 int main(int argc, char * argv[]) {
     @autoreleasepool {
         if (argc > 1 && strcmp(argv[1], "--auto-generate") == 0) {
-            HBLog(@"[UCS] CLI auto-generate mode");
+            CLIWatchLog(@"[UCS] CLI auto-generate mode");
             NSDictionary *cfg = [NSDictionary dictionaryWithContentsOfFile:@"/var/mobile/Documents/hb_schedule.plist"];
-            if (![[cfg objectForKey:@"scheduleOn"] boolValue]) { HBLog(@"[UCS] CLI: schedule off, exit"); return 0; }
+            if (![[cfg objectForKey:@"scheduleOn"] boolValue]) { CLIWatchLog(@"[UCS] CLI: schedule off, exit"); return 0; }
             NSDateFormatter *f = [[NSDateFormatter alloc] init]; f.dateFormat = @"yyyy-MM-dd";
             NSString *today = [f stringFromDate:[NSDate date]];
             NSString *last = [NSString stringWithContentsOfFile:@"/var/mobile/Documents/hb_lastgen.txt" encoding:NSUTF8StringEncoding error:nil];
-            if ([[last stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]] isEqualToString:today]) { HBLog(@"[UCS] CLI: already generated today, exit"); return 0; }
+            if ([[last stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]] isEqualToString:today]) { CLIWatchLog(@"[UCS] CLI: already generated today, exit"); return 0; }
             NSInteger sh = [[cfg objectForKey:@"hour"] integerValue];
             NSInteger sm = [[cfg objectForKey:@"minute"] integerValue];
             NSCalendar *cal = [NSCalendar currentCalendar];
             NSDateComponents *nc = [cal components:NSCalendarUnitHour|NSCalendarUnitMinute fromDate:[NSDate date]];
-            HBLog(@"[UCS] CLI: now=%02ld:%02ld sched=%02ld:%02ld", (long)nc.hour, (long)nc.minute, (long)sh, (long)sm);
-            if (nc.hour < sh || (nc.hour == sh && nc.minute < sm)) { HBLog(@"[UCS] CLI: not time yet, exit"); return 0; }
+            CLIWatchLog(@"[UCS] CLI: now=%02ld:%02ld sched=%02ld:%02ld", (long)nc.hour, (long)nc.minute, (long)sh, (long)sm);
+            if (nc.hour < sh || (nc.hour == sh && nc.minute < sm)) { CLIWatchLog(@"[UCS] CLI: not time yet, exit"); return 0; }
             HBMainViewController *vc = [[HBMainViewController alloc] init];
             vc.isCLI = YES;
             [vc loadSettings];
