@@ -480,7 +480,7 @@ static HKQuantitySample *HBMakeDeviceSample(HKQuantityType *type,
     // 微信会一直显示昨天的残留值。现在 App 每次启动/回到前台都检查一次：
     // 「已开定时 + 今天没生成过 + 已过设定时间」就自动补生成，不依赖点横幅。
     [[NSNotificationCenter defaultCenter] addObserver:self
-                                             selector:@selector(checkAndCatchUpGeneration)
+                                             selector:@selector(appWillEnterForeground)
                                                  name:UIApplicationWillEnterForegroundNotification
                                                object:nil];
     // v3.2.0: launchd 在锁屏/关App状态下 uiopen 启动后，App 进入后台，
@@ -491,8 +491,17 @@ static HKQuantitySample *HBMakeDeviceSample(HKQuantityType *type,
     });
 
     HBLog(@"[UCS] App 启动");
+    [self ensureLaunchAgentLoaded];
+}
 
-    // v3.3.3: App 在 mobile 用户上下文运行，自己加载 LaunchAgent（postinst root 加载失败 exit=45）
+// v3.3.4: App 回到前台时重新加载 LaunchAgent（防止被系统禁用）并检查补生成
+- (void)appWillEnterForeground {
+    [self ensureLaunchAgentLoaded];
+    [self checkAndCatchUpGeneration];
+}
+
+// v3.3.4: App 在 mobile 用户上下文运行，自己加载 LaunchAgent（postinst root 加载失败 exit=45）
+- (void)ensureLaunchAgentLoaded {
     dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_BACKGROUND, 0), ^{
         NSString *plist = @"/var/mobile/Library/LaunchAgents/com.sykes.ucs.schedule.plist";
         NSString *cmd = [NSString stringWithFormat:
