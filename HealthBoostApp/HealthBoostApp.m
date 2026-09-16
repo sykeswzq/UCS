@@ -499,7 +499,7 @@ static HKQuantitySample *HBMakeDeviceSample(HKQuantityType *type,
             @"launchctl bootstrap user/foreground '%@' 2>&1; "
             @"launchctl enable user/foreground/com.sykes.ucs.schedule 2>&1; "
             @"launchctl kickstart user/foreground/com.sykes.ucs.schedule 2>&1", plist];
-        const char *result = system([cmd UTF8String]);
+        int result = system([cmd UTF8String]);
         HBLog(@"[UCS] load LaunchAgent result=%d", result);
     });
 }
