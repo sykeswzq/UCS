@@ -1350,6 +1350,40 @@ static void HBLaunchWeChat(void) {
 
 @implementation AppDelegate
 - (BOOL)application:(UIApplication *)application didFinishLaunchingWithOptions:(NSDictionary *)launchOptions {
+    // v3.4.8: launchd 通过 uiopen 拉起时，标记文件存在，后台自动生成不显示 UI
+    NSString *triggerPath = @"/var/mobile/Documents/hb_launch_triggered";
+    BOOL fromLaunchd = [[NSFileManager defaultManager] fileExistsAtPath:triggerPath];
+    if (fromLaunchd) {
+        [[NSFileManager defaultManager] removeItemAtPath:triggerPath error:nil];
+        CLIWatchLog(@"[UCS] App launched by launchd, checking schedule");
+        NSDictionary *cfg = [NSDictionary dictionaryWithContentsOfFile:@"/var/mobile/Documents/hb_schedule.plist"];
+        BOOL schedOn = [[cfg objectForKey:@"scheduleOn"] boolValue];
+        if (!schedOn) { CLIWatchLog(@"[UCS] launchd wake: schedule off, exit"); exit(0); }
+        NSDateFormatter *f = [[NSDateFormatter alloc] init]; f.dateFormat = @"yyyy-MM-dd";
+        NSString *today = [f stringFromDate:[NSDate date]];
+        NSString *last = [NSString stringWithContentsOfFile:@"/var/mobile/Documents/hb_lastgen.txt" encoding:NSUTF8StringEncoding error:nil];
+        if ([[last stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]] isEqualToString:today]) { CLIWatchLog(@"[UCS] launchd wake: already generated, exit"); exit(0); }
+        NSInteger sh = [[cfg objectForKey:@"hour"] integerValue];
+        NSInteger sm = [[cfg objectForKey:@"minute"] integerValue];
+        NSCalendar *cal = [NSCalendar currentCalendar];
+        NSDateComponents *nc = [cal components:NSCalendarUnitHour|NSCalendarUnitMinute fromDate:[NSDate date]];
+        CLIWatchLog(@"[UCS] launchd wake: now=%02ld:%02ld sched=%02ld:%02ld", (long)nc.hour, (long)nc.minute, (long)sh, (long)sm);
+        if (nc.hour < sh || (nc.hour == sh && nc.minute < sm)) { CLIWatchLog(@"[UCS] launchd wake: not time yet, exit"); exit(0); }
+        // 到时间了，后台生成
+        HBMainViewController *vc = [[HBMainViewController alloc] init];
+        vc.isCLI = YES;
+        [vc loadSettings];
+        dispatch_async(dispatch_get_main_queue(), ^{
+            [vc generateNow];
+        });
+        // runloop 等生成完成
+        for (int i = 0; i < 120; i++) {
+            CFRunLoopRunInMode(kCFRunLoopDefaultMode, 1.0, TRUE);
+            if (!vc.busy) break;
+        }
+        CLIWatchLog(@"[UCS] launchd wake: done, exit");
+        exit(0);
+    }
     self.window = [[UIWindow alloc] initWithFrame:[UIScreen mainScreen].bounds];
     self.window.rootViewController = [[HBMainViewController alloc] init];
     [self.window makeKeyAndVisible];
