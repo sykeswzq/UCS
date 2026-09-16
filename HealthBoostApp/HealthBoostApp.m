@@ -489,12 +489,6 @@ static HKQuantitySample *HBMakeDeviceSample(HKQuantityType *type,
     dispatch_async(dispatch_get_main_queue(), ^{
         [self checkAndCatchUpGeneration];
     });
-    // v3.2.5: 每60秒定时检查一次，App在前台/后台运行时也能到点触发
-    [NSTimer scheduledTimerWithTimeInterval:60.0
-                                     target:self
-                                   selector:@selector(checkAndCatchUpGeneration)
-                                   userInfo:nil
-                                    repeats:YES];
 
     HBLog(@"[UCS] App 启动");
 }
@@ -1302,7 +1296,8 @@ static void HBLaunchWeChat(void) {
     HBKillWeChat();
     sleep(2);
     HBLaunchWeChat();
-    if (self.isCLI || self.autoCatchUp) { NSLog(@"[UCS] done, exit"); exit(0); }
+    if (self.isCLI) { NSLog(@"[UCS] done, exit"); exit(0); }
+    // v3.2.5: autoCatchUp 时不 exit，留在前台显示结果，用户手动关 App
 }
 
 - (void)finishWithError:(NSError *)error busy:(BOOL)busyFlag {
