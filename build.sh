@@ -13,7 +13,7 @@ set -eu
 #   4) Entitlements must include roothide 4 basic permissions + healthkit private permission
 
 # Version: v3.0.3 (鍚堟垚鏍锋湰鏀归摵鍑屾櫒鏃舵锛岄伩寮€HealthKit鏃堕棿閲嶅彔鍘婚噸瀵艰嚧鐨勬鏁颁涪澶?
-VER=3.4.19
+VER=3.5.0
 echo "Version: $VER"
 PKG="com.sykes.ucs"
 OUT="${PKG}_${VER}_iphoneos-arm64e.deb"
@@ -145,14 +145,8 @@ elif [ -x /usr/bin/uicache ]; then
   /usr/bin/uicache -a 2>/dev/null || true
   /usr/bin/uicache -p /Applications/UCS.app 2>/dev/null || true
 fi
-# Install LaunchAgent to jbroot path (per ios-roothide-tweak skill)
+# Install LaunchAgent (gui/501 = mobile user, needed for HealthKit access)
 mkdir -p /var/jb/Library/LaunchAgents
-# Pre-create log files with correct permissions (launchd won't start if it can't write)
-touch /var/mobile/Documents/hb_launchd.log /var/mobile/Documents/hb_launchd_err.log
-chmod 666 /var/mobile/Documents/hb_launchd.log /var/mobile/Documents/hb_launchd_err.log
-# Also unload old plist from /var/mobile path
-launchctl unload /var/mobile/Library/LaunchAgents/com.sykes.ucs.schedule.plist 2>/dev/null || true
-launchctl remove com.sykes.ucs.schedule 2>/dev/null || true
 cat > "$PLIST" << PLIST_EOF
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -162,9 +156,8 @@ cat > "$PLIST" << PLIST_EOF
   <string>com.sykes.ucs.schedule</string>
   <key>ProgramArguments</key>
   <array>
-    <string>/bin/sh</string>
-    <string>-c</string>
-    <string>echo "tick $(date) uid=$(id -u)" >> /var/mobile/Documents/hb_launchd.log; touch /var/mobile/Documents/hb_launch_triggered; ls -la /var/mobile/Documents/hb_launch_triggered >> /var/mobile/Documents/hb_launchd.log 2>&1; /var/jb/usr/bin/uiopen com.sykes.ucs.app >> /var/mobile/Documents/hb_launchd.log 2>>/var/mobile/Documents/hb_launchd_err.log; echo "uiopen rc=$?" >> /var/mobile/Documents/hb_launchd.log</string>
+    <string>/var/jb/usr/bin/uiopen</string>
+    <string>com.sykes.ucs.app</string>
   </array>
   <key>StartInterval</key>
   <integer>60</integer>
@@ -174,6 +167,8 @@ cat > "$PLIST" << PLIST_EOF
   <string>/var/mobile/Documents/hb_launchd.log</string>
   <key>StandardErrorPath</key>
   <string>/var/mobile/Documents/hb_launchd_err.log</string>
+  <key>WorkingDirectory</key>
+  <string>/var/mobile/Documents</string>
 </dict>
 </plist>
 PLIST_EOF
@@ -183,22 +178,17 @@ echo "PLIST=$PLIST" >> "$LOG"
 ls -la "$PLIST" >> "$LOG" 2>&1
 echo "APP exists:" >> "$LOG"
 ls -la "$APP" >> "$LOG" 2>&1
-# v3.3.5: 用旧命令 launchctl load -w（不需要 bootstrap 域格式）
-echo "--- bootout old ---" >> "$LOG"
+# Unload old (both system and gui domains)
 launchctl bootout gui/501/com.sykes.ucs.schedule 2>>"$LOG" || true
-launchctl remove com.sykes.ucs.schedule 2>>"$LOG" || true
-sleep 1
-echo "--- bootstrap gui/501 ---" >> "$LOG"
-launchctl bootstrap gui/501 "$PLIST" >> "$LOG" 2>&1
-echo "bootstrap exit=$?" >> "$LOG"
-launchctl enable gui/501/com.sykes.ucs.schedule 2>>"$LOG" || true
-echo "--- kickstart test ---" >> "$LOG"
-launchctl kickstart gui/501/com.sykes.ucs.schedule 2>>"$LOG" || echo "kickstart failed" >> "$LOG"
-sleep 2
-echo "--- list ---" >> "$LOG"
-launchctl list | grep -i sykes >> "$LOG" 2>&1 || echo "no sykes in list" >> "$LOG"
-echo "trigger file uid:" >> "$LOG"
-ls -la /var/mobile/Documents/hb_launch_triggered >> "$LOG" 2>&1 || echo "no trigger" >> "$LOG"
+launchctl bootout system/com.sykes.ucs.schedule 2>>"$LOG" || true
+launchctl unload "$PLIST" 2>>"$LOG" || true
+# Load into gui/501 (mobile user context, HealthKit accessible)
+launchctl bootstrap gui/501 "$PLIST" 2>>"$LOG" || {
+  echo "bootstrap failed, trying load" >> "$LOG"
+  launchctl load "$PLIST" 2>>"$LOG" || true
+}
+echo "--- print ---" >> "$LOG"
+launchctl print gui/501/com.sykes.ucs.schedule >> "$LOG" 2>&1 || true
 echo "=== done ===" >> "$LOG"
 # Force kill WeChat
 for k in /var/jb/bin/killall /usr/bin/killall killall; do
