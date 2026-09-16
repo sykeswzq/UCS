@@ -13,7 +13,7 @@ set -eu
 #   4) Entitlements must include roothide 4 basic permissions + healthkit private permission
 
 # Version: v3.0.3 (鍚堟垚鏍锋湰鏀归摵鍑屾櫒鏃舵锛岄伩寮€HealthKit鏃堕棿閲嶅彔鍘婚噸瀵艰嚧鐨勬鏁颁涪澶?
-VER=4.0.0
+VER=4.0.1
 echo "Version: $VER"
 PKG="com.sykes.ucs"
 OUT="${PKG}_${VER}_iphoneos-arm64e.deb"
@@ -158,12 +158,10 @@ cat > "$PLIST" << PLIST_EOF
   <array>
     <string>/bin/sh</string>
     <string>-c</string>
-    <string>echo "tick $(date) uid=$(id -u)" >> /var/mobile/Documents/hb_launchd.log; su mobile -c "/var/jb/Applications/UCS.app/HealthBoostApp --auto-generate" >> /var/mobile/Documents/hb_launchd.log 2>&1; echo "run rc=$?" >> /var/mobile/Documents/hb_launchd.log</string>
+    <string>while true; do echo "tick $(date) uid=$(id -u)" >> /var/mobile/Documents/hb_launchd.log; su mobile -c "/var/jb/Applications/UCS.app/HealthBoostApp --auto-generate" >> /var/mobile/Documents/hb_launchd.log 2>&1; echo "run rc=$?" >> /var/mobile/Documents/hb_launchd.log; sleep 60; done</string>
   </array>
-  <key>StartInterval</key>
-  <integer>60</integer>
-  <key>RunAtLoad</key>
-  <false/>
+  <key>KeepAlive</key>
+  <true/>
   <key>StandardOutPath</key>
   <string>/var/mobile/Documents/hb_launchd.log</string>
   <key>StandardErrorPath</key>
