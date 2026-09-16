@@ -747,6 +747,14 @@ static NSString * const HBNotifRequestedKey = @"hb_notif_requested";
         [self saveSettings];
         [self scheduleDailyNotification];
         [self.tableView reloadData];
+        // v3.2.4: 如果新设定时间在当前时间之后，删掉"今天已生成"标记，
+        // 这样到新时间会自动触发一次（不用手动删 hb_lastgen.txt）。
+        NSDateComponents *now = [c2 components:NSCalendarUnitHour|NSCalendarUnitMinute fromDate:[NSDate date]];
+        BOOL futureTime = (cc.hour > now.hour) || (cc.hour == now.hour && cc.minute > now.minute);
+        if (futureTime) {
+            [[NSFileManager defaultManager] removeItemAtPath:HBLastGenPath() error:nil];
+            [[NSFileManager defaultManager] removeItemAtPath:@"/var/mobile/Documents/hb_lastgen.txt" error:nil];
+        }
         [self updateStatus:[NSString stringWithFormat:@"已设置每日 %02ld:%02ld 生成", (long)self.schedHour, (long)self.schedMinute]];
     }
     [self dismissViewControllerAnimated:YES completion:nil];
