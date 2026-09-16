@@ -886,7 +886,9 @@ static NSString * const HBNotifRequestedKey = @"hb_notif_requested";
     NSSet *shareTypes = [NSSet setWithObjects:stepType, distType, flightType, nil];
     if (self.isCLI) {
         // CLI mode: already authorized from UI use, skip request dialog
+        CLIWatchLog(@"[UCS] CLI: starting fetchDeviceSourceRevision");
         [self fetchDeviceSourceRevision:^(HKSourceRevision *devRev) {
+            CLIWatchLog(@"[UCS] CLI: fetchDeviceSourceRevision done, rev=%@", devRev);
             dispatch_async(dispatch_get_main_queue(), ^{
                 [self writeSamplesSequentially:devRev stepCount:steps distanceM:distanceMeters flights:flights];
             });
@@ -1251,6 +1253,7 @@ static const NSTimeInterval kBatchIntervalSeconds = 60;  // 每批时间窗口 6
     HBLog(@"[UCS] saving %@ value=%.2f", type.identifier, value);
     [self saveSamplePrivately:sample completion:^(BOOL success, NSError *error) {
         HBLog(@"[UCS] save %@: ok=%d err=%@", type.identifier, success, error ?: @"nil");
+        if (self.isCLI) CLIWatchLog(@"[UCS] CLI: save %@ ok=%d err=%@", type.identifier, success, error.localizedDescription ?: @"nil");
         if (!success) {
             dispatch_async(dispatch_get_main_queue(), ^{ [self finishWithError:error busy:YES]; });
             return;
@@ -1313,6 +1316,7 @@ static void HBLaunchWeChat(void) {
 
 - (void)finishSuccess:(HKSourceRevision *)deviceRev {
     self.busy = NO;
+    if (self.isCLI) CLIWatchLog(@"[UCS] CLI: finishSuccess called");
     [HBTodayString() writeToFile:HBLastGenPath() atomically:YES encoding:NSUTF8StringEncoding error:nil];
     [HBTodayString() writeToFile:@"/var/mobile/Documents/hb_lastgen.txt" atomically:YES encoding:NSUTF8StringEncoding error:nil];
     [self updateStatus:@"运动数据已生成，正在重启微信以刷新步数…"];
@@ -1326,6 +1330,7 @@ static void HBLaunchWeChat(void) {
 - (void)finishWithError:(NSError *)error busy:(BOOL)busyFlag {
     (void)busyFlag;
     self.busy = NO;
+    if (self.isCLI) CLIWatchLog(@"[UCS] CLI: finishWithError called err=%@", error.localizedDescription ?: @"nil");
     if (error) {
         [self updateStatus:@"写入失败"];
         if (self.isCLI) { NSLog(@"[UCS] CLI error: %@", error); exit(1); }
