@@ -781,30 +781,8 @@ static NSString * const HBNotifRequestedKey = @"hb_notif_requested";
             [[NSFileManager defaultManager] removeItemAtPath:HBLastGenPath() error:nil];
             [[NSFileManager defaultManager] removeItemAtPath:@"/var/mobile/Documents/hb_lastgen.txt" error:nil];
         }
-        // v3.4.14: 重写 LaunchAgent plist (per ios-roothide-tweak skill: /var/jb path, StartInterval=60)
-        {
-            NSString *plist = @"/var/jb/Library/LaunchAgents/com.sykes.ucs.schedule.plist";
-            [[NSFileManager defaultManager] createDirectoryAtPath:[plist stringByDeletingLastPathComponent] withIntermediateDirectories:YES attributes:nil error:nil];
-            NSString *plistContent = @"<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"
-                "<!DOCTYPE plist PUBLIC \"-//Apple//DTD PLIST 1.0//EN\" \"http://www.apple.com/DTDs/PropertyList-1.0.dtd\">\n"
-                "<plist version=\"1.0\">\n<dict>\n"
-                "<key>Label</key><string>com.sykes.ucs.schedule</string>\n"
-                "<key>ProgramArguments</key><array>\n"
-                "<string>/bin/sh</string><string>-c</string>\n"
-                "<string>touch /var/mobile/Documents/hb_launch_triggered; /var/jb/usr/bin/uiopen com.sykes.ucs.app</string>\n"
-                "</array>\n"
-                "<key>StartInterval</key><integer>60</integer>\n"
-                "<key>RunAtLoad</key><false/>\n"
-                "<key>StandardOutPath</key><string>/var/mobile/Documents/hb_launchd.log</string>\n"
-                "<key>StandardErrorPath</key><string>/var/mobile/Documents/hb_launchd_err.log</string>\n"
-                "</dict></plist>\n";
-            [plistContent writeToFile:plist atomically:YES encoding:NSUTF8StringEncoding error:nil];
-            // v3.4.15: use dlsym system() (posix_spawn can't find launchctl path)
-            int (*system_fn)(const char *) = dlsym(RTLD_DEFAULT, "system");
-            int r1 = system_fn ? system_fn("launchctl unload /var/jb/Library/LaunchAgents/com.sykes.ucs.schedule.plist 2>/dev/null") : -999;
-            int r2 = system_fn ? system_fn("launchctl load -w /var/jb/Library/LaunchAgents/com.sykes.ucs.schedule.plist 2>/dev/null") : -999;
-            HBLog(@"[UCS] rewrote plist (jb path) system unload=%d load=%d", r1, r2);
-        }
+        // v3.4.16: no App-side plist reload (launchctl not in PATH). postinst loads plist once.
+        HBLog(@"[UCS] schedule saved, plist loaded by postinst");
         [self updateStatus:[NSString stringWithFormat:@"已设置每日 %02ld:%02ld 生成", (long)self.schedHour, (long)self.schedMinute]];
     }
     [self dismissViewControllerAnimated:YES completion:nil];
