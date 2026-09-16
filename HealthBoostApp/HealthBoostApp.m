@@ -484,9 +484,11 @@ static HKQuantitySample *HBMakeDeviceSample(HKQuantityType *type,
                                                  name:UIApplicationWillEnterForegroundNotification
                                                object:nil];
     // v3.2.0: launchd 在锁屏/关App状态下 uiopen 启动后，App 进入后台，
-    // afterDelay:1.0 的 performSelector 可能不被 runloop 执行，导致定时不触发。
-    // 改为立即调用，不延迟。
-    [self checkAndCatchUpGeneration];
+    // afterDelay:1.0 的 performSelector 可能不被 runloop 执行。
+    // 改为 dispatch_async 到下一个 runloop（不延迟但异步，避免 viewDidLoad 同步崩溃）。
+    dispatch_async(dispatch_get_main_queue(), ^{
+        [self checkAndCatchUpGeneration];
+    });
 
     HBLog(@"[UCS] App 启动");
 }
