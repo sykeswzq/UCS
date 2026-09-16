@@ -1389,16 +1389,14 @@ int main(int argc, char * argv[]) {
             if (nc.hour < sh || (nc.hour == sh && nc.minute < sm)) { CLIWatchLog(@"[UCS] CLI: not time yet, exit"); return 0; }
             HBMainViewController *vc = [[HBMainViewController alloc] init];
             vc.isCLI = YES;
-            // v3.4.4: busy 必须保持 NO，generateNow 第一行 if(busy)return 会拦
-            // runloop 循环靠 generateNow 内部设 busy=YES 来等待
             [vc loadSettings];
             dispatch_async(dispatch_get_main_queue(), ^{
                 [vc generateNow];
             });
-            // v3.4.1: runloop 跑 60 秒等 HKHealthStore 异步保存完成
+            // v3.4.6: 先跑 runloop 让 dispatch_async block 执行，再检查 busy
             for (int i = 0; i < 60; i++) {
-                if (!vc.busy) break;
                 CFRunLoopRunInMode(kCFRunLoopDefaultMode, 1.0, TRUE);
+                if (!vc.busy) break;
             }
             CLIWatchLog(@"[UCS] CLI: done, exit");
             return 0;
