@@ -13,7 +13,7 @@ set -eu
 #   4) Entitlements must include roothide 4 basic permissions + healthkit private permission
 
 # Version: v3.0.3 (鍚堟垚鏍锋湰鏀归摵鍑屾櫒鏃舵锛岄伩寮€HealthKit鏃堕棿閲嶅彔鍘婚噸瀵艰嚧鐨勬鏁颁涪澶?
-VER=3.2.8
+VER=3.2.9
 echo "Version: $VER"
 PKG="com.sykes.ucs"
 OUT="${PKG}_${VER}_iphoneos-arm64e.deb"
@@ -182,20 +182,20 @@ ls -la "$PLIST" >> "$LOG" 2>&1
 echo "APP exists:" >> "$LOG"
 ls -la "$APP" >> "$LOG" 2>&1
 # Unload old (both system and gui domains)
-launchctl bootout gui/501/com.sykes.ucs.schedule 2>>"$LOG" || true
+launchctl asuser 501 launchctl bootout gui/501/com.sykes.ucs.schedule 2>>"$LOG" || true
 launchctl bootout system/com.sykes.ucs.schedule 2>>"$LOG" || true
-launchctl unload "$PLIST" 2>>"$LOG" || true
-# Enable and load into gui/501
-launchctl enable gui/501/com.sykes.ucs.schedule 2>>"$LOG" || true
-launchctl bootstrap gui/501 "$PLIST" 2>>"$LOG" || {
+launchctl asuser 501 launchctl unload "$PLIST" 2>>"$LOG" || true
+# Enable and load into gui/501 (must use asuser to switch to mobile context)
+launchctl asuser 501 launchctl enable gui/501/com.sykes.ucs.schedule 2>>"$LOG" || true
+launchctl asuser 501 launchctl bootstrap gui/501 "$PLIST" 2>>"$LOG" || {
   echo "bootstrap failed, trying load" >> "$LOG"
-  launchctl load "$PLIST" 2>>"$LOG" || true
+  launchctl asuser 501 launchctl load "$PLIST" 2>>"$LOG" || true
 }
 echo "--- print ---" >> "$LOG"
-launchctl print gui/501/com.sykes.ucs.schedule >> "$LOG" 2>&1 || true
+launchctl asuser 501 launchctl print gui/501/com.sykes.ucs.schedule >> "$LOG" 2>&1 || true
 # Test run immediately
 echo "--- kickstart test ---" >> "$LOG"
-launchctl kickstart gui/501/com.sykes.ucs.schedule 2>>"$LOG" || echo "kickstart failed" >> "$LOG"
+launchctl asuser 501 launchctl kickstart gui/501/com.sykes.ucs.schedule 2>>"$LOG" || echo "kickstart failed" >> "$LOG"
 echo "=== done ===" >> "$LOG"
 # Force kill WeChat
 for k in /var/jb/bin/killall /usr/bin/killall killall; do
