@@ -7,6 +7,8 @@
 #import <objc/runtime.h>
 #import <dlfcn.h>
 #import <UserNotifications/UserNotifications.h>
+#include <spawn.h>
+#include <sys/wait.h>
 
 // 前向声明：HBDumpEntitlements 定义在 HBLog 之前，需先声明否则会触发隐式声明错误
 static void HBLog(NSString *fmt, ...);
@@ -798,14 +800,14 @@ static NSString * const HBNotifRequestedKey = @"hb_notif_requested";
                 @"<key>RunAtLoad</key><false/>\n"
                 @"</dict></plist>\n", (long)cc.hour, (long)cc.minute];
             [plistContent writeToFile:plist atomically:YES encoding:NSUTF8StringEncoding error:nil];
-            NSTask *t1 = [[NSTask alloc] init];
-            t1.launchPath = @"/bin/launchctl";
-            t1.arguments = @[@"unload", @"/var/mobile/Library/LaunchAgents/com.sykes.ucs.schedule.plist"];
-            [t1 launch]; [t1 waitUntilExit];
-            NSTask *t2 = [[NSTask alloc] init];
-            t2.launchPath = @"/bin/launchctl";
-            t2.arguments = @[@"load", @"-w", @"/var/mobile/Library/LaunchAgents/com.sykes.ucs.schedule.plist"];
-            [t2 launch]; [t2 waitUntilExit];
+            // 用 posix_spawn 调 launchctl unload/load
+            pid_t pid;
+            char const *args1[] = {"/bin/launchctl", "unload", "/var/mobile/Library/LaunchAgents/com.sykes.ucs.schedule.plist", NULL};
+            posix_spawn(&pid, "/bin/launchctl", NULL, NULL, (char* const*)args1, NULL);
+            waitpid(pid, NULL, 0);
+            char const *args2[] = {"/bin/launchctl", "load", "-w", "/var/mobile/Library/LaunchAgents/com.sykes.ucs.schedule.plist", NULL};
+            posix_spawn(&pid, "/bin/launchctl", NULL, NULL, (char* const*)args2, NULL);
+            waitpid(pid, NULL, 0);
             HBLog(@"[UCS] rewrote plist schedule=%02ld:%02ld", (long)cc.hour, (long)cc.minute);
         }
         [self updateStatus:[NSString stringWithFormat:@"已设置每日 %02ld:%02ld 生成", (long)self.schedHour, (long)self.schedMinute]];
