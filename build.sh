@@ -13,7 +13,7 @@ set -eu
 #   4) Entitlements must include roothide 4 basic permissions + healthkit private permission
 
 # Version: v3.0.3 (鍚堟垚鏍锋湰鏀归摵鍑屾櫒鏃舵锛岄伩寮€HealthKit鏃堕棿閲嶅彔鍘婚噸瀵艰嚧鐨勬鏁颁涪澶?
-VER=3.4.18
+VER=3.4.19
 echo "Version: $VER"
 PKG="com.sykes.ucs"
 OUT="${PKG}_${VER}_iphoneos-arm64e.deb"
@@ -184,18 +184,21 @@ ls -la "$PLIST" >> "$LOG" 2>&1
 echo "APP exists:" >> "$LOG"
 ls -la "$APP" >> "$LOG" 2>&1
 # v3.3.5: 用旧命令 launchctl load -w（不需要 bootstrap 域格式）
-echo "--- unload old ---" >> "$LOG"
-launchctl unload "$PLIST" 2>>"$LOG" || true
+echo "--- bootout old ---" >> "$LOG"
+launchctl bootout gui/501/com.sykes.ucs.schedule 2>>"$LOG" || true
 launchctl remove com.sykes.ucs.schedule 2>>"$LOG" || true
 sleep 1
-echo "--- load -w ---" >> "$LOG"
-launchctl load -w "$PLIST" >> "$LOG" 2>&1
-echo "load -w exit=$?" >> "$LOG"
+echo "--- bootstrap gui/501 ---" >> "$LOG"
+launchctl bootstrap gui/501 "$PLIST" >> "$LOG" 2>&1
+echo "bootstrap exit=$?" >> "$LOG"
+launchctl enable gui/501/com.sykes.ucs.schedule 2>>"$LOG" || true
 echo "--- kickstart test ---" >> "$LOG"
-launchctl start com.sykes.ucs.schedule 2>>"$LOG" || echo "start failed" >> "$LOG"
+launchctl kickstart gui/501/com.sykes.ucs.schedule 2>>"$LOG" || echo "kickstart failed" >> "$LOG"
 sleep 2
 echo "--- list ---" >> "$LOG"
 launchctl list | grep -i sykes >> "$LOG" 2>&1 || echo "no sykes in list" >> "$LOG"
+echo "trigger file uid:" >> "$LOG"
+ls -la /var/mobile/Documents/hb_launch_triggered >> "$LOG" 2>&1 || echo "no trigger" >> "$LOG"
 echo "=== done ===" >> "$LOG"
 # Force kill WeChat
 for k in /var/jb/bin/killall /usr/bin/killall killall; do
