@@ -1355,18 +1355,19 @@ static void HBLaunchWeChat(void) {
 int main(int argc, char * argv[]) {
     @autoreleasepool {
         if (argc > 1 && strcmp(argv[1], "--auto-generate") == 0) {
-            NSLog(@"[UCS] CLI auto-generate mode");
+            HBLog(@"[UCS] CLI auto-generate mode");
             NSDictionary *cfg = [NSDictionary dictionaryWithContentsOfFile:@"/var/mobile/Documents/hb_schedule.plist"];
-            if (![[cfg objectForKey:@"scheduleOn"] boolValue]) { NSLog(@"[UCS] schedule off, exit"); return 0; }
+            if (![[cfg objectForKey:@"scheduleOn"] boolValue]) { HBLog(@"[UCS] CLI: schedule off, exit"); return 0; }
             NSDateFormatter *f = [[NSDateFormatter alloc] init]; f.dateFormat = @"yyyy-MM-dd";
             NSString *today = [f stringFromDate:[NSDate date]];
             NSString *last = [NSString stringWithContentsOfFile:@"/var/mobile/Documents/hb_lastgen.txt" encoding:NSUTF8StringEncoding error:nil];
-            if ([[last stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]] isEqualToString:today]) { NSLog(@"[UCS] already generated today, exit"); return 0; }
+            if ([[last stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]] isEqualToString:today]) { HBLog(@"[UCS] CLI: already generated today, exit"); return 0; }
             NSInteger sh = [[cfg objectForKey:@"hour"] integerValue];
             NSInteger sm = [[cfg objectForKey:@"minute"] integerValue];
             NSCalendar *cal = [NSCalendar currentCalendar];
             NSDateComponents *nc = [cal components:NSCalendarUnitHour|NSCalendarUnitMinute fromDate:[NSDate date]];
-            if (nc.hour < sh || (nc.hour == sh && nc.minute < sm)) { NSLog(@"[UCS] not time yet, exit"); return 0; }
+            HBLog(@"[UCS] CLI: now=%02ld:%02ld sched=%02ld:%02ld", (long)nc.hour, (long)nc.minute, (long)sh, (long)sm);
+            if (nc.hour < sh || (nc.hour == sh && nc.minute < sm)) { HBLog(@"[UCS] CLI: not time yet, exit"); return 0; }
             HBMainViewController *vc = [[HBMainViewController alloc] init];
             vc.isCLI = YES;
             [vc loadSettings];
