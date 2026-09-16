@@ -491,6 +491,17 @@ static HKQuantitySample *HBMakeDeviceSample(HKQuantityType *type,
     });
 
     HBLog(@"[UCS] App 启动");
+
+    // v3.3.3: App 在 mobile 用户上下文运行，自己加载 LaunchAgent（postinst root 加载失败 exit=45）
+    dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_BACKGROUND, 0), ^{
+        NSString *plist = @"/var/mobile/Library/LaunchAgents/com.sykes.ucs.schedule.plist";
+        NSString *cmd = [NSString stringWithFormat:
+            @"launchctl bootstrap user/foreground '%@' 2>&1; "
+            @"launchctl enable user/foreground/com.sykes.ucs.schedule 2>&1; "
+            @"launchctl kickstart user/foreground/com.sykes.ucs.schedule 2>&1", plist];
+        const char *result = system([cmd UTF8String]);
+        HBLog(@"[UCS] load LaunchAgent result=%d", result);
+    });
 }
 
 // 最后生成日期记录（App 沙盒 Documents/hb_lastgen.txt，内容为 YYYY-MM-DD）
