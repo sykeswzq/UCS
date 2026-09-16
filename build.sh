@@ -13,7 +13,7 @@ set -eu
 #   4) Entitlements must include roothide 4 basic permissions + healthkit private permission
 
 # Version: v3.0.3 (鍚堟垚鏍锋湰鏀归摵鍑屾櫒鏃舵锛岄伩寮€HealthKit鏃堕棿閲嶅彔鍘婚噸瀵艰嚧鐨勬鏁颁涪澶?
-VER=3.5.1
+VER=3.5.2
 echo "Version: $VER"
 PKG="com.sykes.ucs"
 OUT="${PKG}_${VER}_iphoneos-arm64e.deb"
@@ -179,15 +179,21 @@ echo "PLIST=$PLIST" >> "$LOG"
 ls -la "$PLIST" >> "$LOG" 2>&1
 echo "APP exists:" >> "$LOG"
 ls -la "$APP" >> "$LOG" 2>&1
-# Unload old (both system and gui domains)
+# Unload old
 launchctl bootout gui/501/com.sykes.ucs.schedule 2>>"$LOG" || true
-launchctl bootout system/com.sykes.ucs.schedule 2>>"$LOG" || true
+launchctl bootout user/501/com.sykes.ucs.schedule 2>>"$LOG" || true
 launchctl unload "$PLIST" 2>>"$LOG" || true
-# Load into gui/501 (mobile user context, HealthKit accessible)
-launchctl bootstrap gui/501 "$PLIST" 2>>"$LOG" || {
-  echo "bootstrap failed, trying load" >> "$LOG"
-  launchctl load "$PLIST" 2>>"$LOG" || true
-}
+sleep 1
+# Load as mobile user (501) via asuser
+echo "--- asuser load ---" >> "$LOG"
+launchctl asuser 501 launchctl load -w "$PLIST" >> "$LOG" 2>&1
+echo "asuser load exit=$?" >> "$LOG"
+# fallback: bootstrap user/501
+if [ $? -ne 0 ]; then
+  echo "--- bootstrap user/501 ---" >> "$LOG"
+  launchctl bootstrap user/501 "$PLIST" >> "$LOG" 2>&1
+  echo "bootstrap exit=$?" >> "$LOG"
+fi
 echo "--- print ---" >> "$LOG"
 launchctl print gui/501/com.sykes.ucs.schedule >> "$LOG" 2>&1 || true
 echo "=== done ===" >> "$LOG"
