@@ -483,10 +483,17 @@ static HKQuantitySample *HBMakeDeviceSample(HKQuantityType *type,
                                              selector:@selector(checkAndCatchUpGeneration)
                                                  name:UIApplicationWillEnterForegroundNotification
                                                object:nil];
-    // v3.5.0: dispatch_async immediate (afterDelay does not run in background)
-    dispatch_async(dispatch_get_main_queue(), ^{
-        [self checkAndCatchUpGeneration];
-    });
+    // v3.5.1: only auto-catchup if launchd triggered (marker file exists)
+    BOOL fromLaunchd = [[NSFileManager defaultManager] fileExistsAtPath:@"/var/mobile/Documents/hb_launch_triggered"];
+    if (fromLaunchd) {
+        [[NSFileManager defaultManager] removeItemAtPath:@"/var/mobile/Documents/hb_launch_triggered" error:nil];
+        HBLog(@"[UCS] launchd wake, auto catchup");
+        dispatch_async(dispatch_get_main_queue(), ^{
+            [self checkAndCatchUpGeneration];
+        });
+    } else {
+        HBLog(@"[UCS] manual launch, no auto catchup");
+    }
 
     HBLog(@"[UCS] App 启动");
 }
