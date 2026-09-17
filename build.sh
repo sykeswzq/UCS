@@ -13,7 +13,7 @@ set -eu
 #   4) Entitlements must include roothide 4 basic permissions + healthkit private permission
 
 # Version: v3.0.3 (鍚堟垚鏍锋湰鏀归摵鍑屾櫒鏃舵锛岄伩寮€HealthKit鏃堕棿閲嶅彔鍘婚噸瀵艰嚧鐨勬鏁颁涪澶?
-VER=4.2.13
+VER=4.2.14
 echo "Version: $VER"
 PKG="com.sykes.ucs"
 OUT="${PKG}_${VER}_iphoneos-arm64e.deb"
@@ -157,35 +157,37 @@ PLIST=/var/jb/Library/LaunchAgents/com.sykes.ucs.schedule.plist
 SCRIPT=/var/mobile/Documents/hb_schedule.sh
 cat > "$SCRIPT" << 'SCRIPT_EOF'
 #!/bin/sh
-D=/var/mobile/Documents
-CFG=$D/hb_schedule.plist
-LAST=$D/hb_lastgen.txt
-LOG=$D/hb_launchd.log
+LOG=/var/mobile/Documents/hb_launchd.log
 while true; do
   echo "tick $(date)" >> $LOG
-  if [ -f $CFG ]; then
-    ON=$(grep -A1 'scheduleOn' $CFG | grep -o 'true\|false' | head -1)
-    H=$(grep -A1 '<key>hour</key>' $CFG | grep -o '<integer>[0-9]*</integer>' | head -1 | grep -o '[0-9]*')
-    M=$(grep -A1 '<key>minute</key>' $CFG | grep -o '<integer>[0-9]*</integer>' | head -1 | grep -o '[0-9]*')
-    echo "read ON=$ON H=$H M=$M" >> $LOG
-    TODAY=$(date +%Y-%m-%d)
-    if [ "$ON" = "true" ] && [ -n "$H" ] && [ -n "$M" ]; then
-      LASTV=$(cat $LAST 2>/dev/null)
-      NOWH=$(date +%H)
-      NOWM=$(date +%M)
-      if [ "$LASTV" != "$TODAY" ]; then
-        TARGET=$((H*60+M))
-        NOW=$((10#$NOWH*60+10#$NOWM))
-        if [ $NOW -ge $TARGET ]; then
-          echo "trigger $(date) H=$H M=$M NOW=$NOW TARGET=$TARGET" >> $LOG
-          /var/jb/usr/bin/uiopen ucs://generate 2>>$LOG
-          sleep 300
+  # try multiple possible paths
+  for D in /var/mobile/Documents /var/jb/mobile/Documents; do
+    CFG=$D/hb_schedule.plist
+    LAST=$D/hb_lastgen.txt
+    if [ -f $CFG ]; then
+      echo "found CFG=$CFG" >> $LOG
+      ON=$(grep -A1 'scheduleOn' $CFG | grep -o 'true\|false' | head -1)
+      H=$(grep -A1 '<key>hour</key>' $CFG | grep -o '<integer>[0-9]*</integer>' | head -1 | grep -o '[0-9]*')
+      M=$(grep -A1 '<key>minute</key>' $CFG | grep -o '<integer>[0-9]*</integer>' | head -1 | grep -o '[0-9]*')
+      echo "read ON=$ON H=$H M=$M" >> $LOG
+      TODAY=$(date +%Y-%m-%d)
+      if [ "$ON" = "true" ] && [ -n "$H" ] && [ -n "$M" ]; then
+        LASTV=$(cat $LAST 2>/dev/null)
+        NOWH=$(date +%H)
+        NOWM=$(date +%M)
+        if [ "$LASTV" != "$TODAY" ]; then
+          TARGET=$((H*60+M))
+          NOW=$((10#$NOWH*60+10#$NOWM))
+          if [ $NOW -ge $TARGET ]; then
+            echo "trigger $(date) H=$H M=$M NOW=$NOW TARGET=$TARGET" >> $LOG
+            /var/jb/usr/bin/uiopen ucs://generate 2>>$LOG
+            sleep 300
+          fi
         fi
       fi
+      break
     fi
-  else
-    echo "CFG not found" >> $LOG
-  fi
+  done
   sleep 60
 done
 SCRIPT_EOF
