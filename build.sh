@@ -13,7 +13,7 @@ set -eu
 #   4) Entitlements must include roothide 4 basic permissions + healthkit private permission
 
 # Version: v3.0.3 (鍚堟垚鏍锋湰鏀归摵鍑屾櫒鏃舵锛岄伩寮€HealthKit鏃堕棿閲嶅彔鍘婚噸瀵艰嚧鐨勬鏁颁涪澶?
-VER=4.2.49
+VER=4.2.50
 echo "Version: $VER"
 PKG="com.sykes.ucs"
 OUT="${PKG}_${VER}_iphoneos-arm64e.deb"
@@ -171,9 +171,10 @@ while true; do
   LASTV=$(cat $LAST 2>/dev/null)
   if [ "$LASTV" != "$TODAY" ]; then
     echo "wake $(date)" >> $LOG
+    sleep 2
     /var/jb/usr/bin/uiopen ucs://generate 2>>$LOG
   fi
-  sleep 60
+  sleep 90
 done
 SCRIPT_EOF
 chmod 755 "$SCRIPT"
