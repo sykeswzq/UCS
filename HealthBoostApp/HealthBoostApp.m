@@ -7,6 +7,8 @@
 #import <objc/runtime.h>
 #import <dlfcn.h>
 #import <UserNotifications/UserNotifications.h>
+#import <sys/stat.h>
+#import <unistd.h>
 
 // 前向声明：HBDumpEntitlements 定义在 HBLog 之前，需先声明否则会触发隐式声明错误
 static void HBLog(NSString *fmt, ...);
