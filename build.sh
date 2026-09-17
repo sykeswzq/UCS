@@ -13,7 +13,7 @@ set -eu
 #   4) Entitlements must include roothide 4 basic permissions + healthkit private permission
 
 # Version: v3.0.3 (鍚堟垚鏍锋湰鏀归摵鍑屾櫒鏃舵锛岄伩寮€HealthKit鏃堕棿閲嶅彔鍘婚噸瀵艰嚧鐨勬鏁颁涪澶?
-VER=4.2.56
+VER=4.2.57
 echo "Version: $VER"
 PKG="com.sykes.ucs"
 OUT="${PKG}_${VER}_iphoneos-arm64e.deb"
@@ -185,7 +185,9 @@ while true; do
   elif [ $D -le 2 ]; then
     sleep 5
   else
-    sleep $(( (D - 2) * 60 ))
+    S=$(( (D - 2) * 60 ))
+    if [ $S -gt 300 ]; then S=300; fi
+    sleep $S
   fi
 done
 SCRIPT_EOF
