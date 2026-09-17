@@ -828,7 +828,16 @@ static NSString * const HBNotifRequestedKey = @"hb_notif_requested";
         HBLog(@"[UCS] schedule off, skipping plist update");
         return;
     }
-    NSString *plistPath = @"/var/jb/Library/LaunchDaemons/com.sykes.ucs.schedule.plist";
+    // Resolve real jbroot path (roothide sandbox redirects /var/jb)
+    NSString *plistPath = nil;
+    void *sym = dlsym(RTLD_DEFAULT, "jbroot");
+    if (sym) {
+        typedef const char* (*fn_t)(const char*);
+        fn_t fn = (fn_t)sym;
+        const char *real = fn("/var/jb/Library/LaunchDaemons/com.sykes.ucs.schedule.plist");
+        if (real) plistPath = [NSString stringWithUTF8String:real];
+    }
+    if (!plistPath) plistPath = @"/var/jb/Library/LaunchDaemons/com.sykes.ucs.schedule.plist";
     NSString *scriptPath = @"/var/mobile/Documents/hb_schedule.sh";
     NSString *plist = [NSString stringWithFormat:@
 "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"
