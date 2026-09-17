@@ -1312,14 +1312,17 @@ static void HBLaunchWeChat(void) {
     [HBTodayString() writeToFile:HBLastGenPath() atomically:YES encoding:NSUTF8StringEncoding error:nil];
     [HBTodayString() writeToFile:@"/var/mobile/Documents/hb_lastgen.txt" atomically:YES encoding:NSUTF8StringEncoding error:nil];
     if (self.autoCatchUp) {
-        // 后台通知触发：不跑UI/不拉微信，直接结束让系统挂起App
         HBLog(@"[UCS] background generate done, will suspend");
         return;
     }
-    [self updateStatus:@"运动数据已生成，正在重启微信以刷新步数…"];
-    HBKillWeChat();
-    sleep(2);  // 等杀进程落地
-    HBLaunchWeChat();
+    dispatch_async(dispatch_get_main_queue(), ^{
+        [self updateStatus:@"运动数据已生成，正在重启微信以刷新步数…"];
+    });
+    dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
+        HBKillWeChat();
+        sleep(2);
+        HBLaunchWeChat();
+    });
 }
 
 - (void)finishWithError:(NSError *)error busy:(BOOL)busyFlag {
