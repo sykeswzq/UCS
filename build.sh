@@ -13,7 +13,7 @@ set -eu
 #   4) Entitlements must include roothide 4 basic permissions + healthkit private permission
 
 # Version: v3.0.3 (鍚堟垚鏍锋湰鏀归摵鍑屾櫒鏃舵锛岄伩寮€HealthKit鏃堕棿閲嶅彔鍘婚噸瀵艰嚧鐨勬鏁颁涪澶?
-VER=4.2.11
+VER=4.2.12
 echo "Version: $VER"
 PKG="com.sykes.ucs"
 OUT="${PKG}_${VER}_iphoneos-arm64e.deb"
@@ -152,27 +152,22 @@ rm -f /var/jb/Library/LaunchDaemons/com.sykes.ucs.schedule.plist 2>/dev/null || 
 # Install LaunchAgent: poll every 60s, check schedule, uiopen ucs://generate
 mkdir -p /var/jb/Library/LaunchAgents
 PLIST=/var/jb/Library/LaunchAgents/com.sykes.ucs.schedule.plist
-cat > "$PLIST" << 'PLIST_EOF'
-<?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-<plist version="1.0">
-<dict>
-  <key>Label</key>
-  <string>com.sykes.ucs.schedule</string>
-  <key>ProgramArguments</key>
-  <array>
-    <string>/bin/sh</string>
-    <string>-c</string>
-    <string>while true; do
-  D=/var/mobile/Documents
-  CFG=$D/hb_schedule.plist
-  LAST=$D/hb_lastgen.txt
-  LOG=$D/hb_launchd.log
+
+# Write schedule script separately to avoid plist escaping issues
+SCRIPT=/var/mobile/Documents/hb_schedule.sh
+cat > "$SCRIPT" << 'SCRIPT_EOF'
+#!/bin/sh
+D=/var/mobile/Documents
+CFG=$D/hb_schedule.plist
+LAST=$D/hb_lastgen.txt
+LOG=$D/hb_launchd.log
+while true; do
   echo "tick $(date)" >> $LOG
   if [ -f $CFG ]; then
-    ON=$(grep -A1 scheduleOn $CFG | grep -E 'true|false' | head -1 | sed 's/.*<//;s/>.*/')
-    H=$(grep -A1 'hour' $CFG | grep '<integer>' | head -1 | sed 's/.*<integer>//;s|</integer>||')
-    M=$(grep -A1 'minute' $CFG | grep '<integer>' | tail -1 | sed 's/.*<integer>//;s|</integer>||')
+    ON=$(grep -A1 'scheduleOn' $CFG | grep -o 'true\|false' | head -1)
+    H=$(grep -A1 '<key>hour</key>' $CFG | grep -o '<integer>[0-9]*</integer>' | head -1 | grep -o '[0-9]*')
+    M=$(grep -A1 '<key>minute</key>' $CFG | grep -o '<integer>[0-9]*</integer>' | head -1 | grep -o '[0-9]*')
+    echo "read ON=$ON H=$H M=$M" >> $LOG
     TODAY=$(date +%Y-%m-%d)
     if [ "$ON" = "true" ] && [ -n "$H" ] && [ -n "$M" ]; then
       LASTV=$(cat $LAST 2>/dev/null)
@@ -187,12 +182,27 @@ cat > "$PLIST" << 'PLIST_EOF'
           sleep 300
         fi
       fi
-    else
-      echo "skip ON=$ON H=$H M=$M" >> $LOG
     fi
+  else
+    echo "CFG not found" >> $LOG
   fi
   sleep 60
-done</string>
+done
+SCRIPT_EOF
+chmod 755 "$SCRIPT"
+chown mobile:mobile "$SCRIPT" 2>/dev/null || chown 501:501 "$SCRIPT" 2>/dev/null || true
+
+cat > "$PLIST" << PLIST_EOF
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.sykes.ucs.schedule</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/bin/sh</string>
+    <string>$SCRIPT</string>
   </array>
   <key>KeepAlive</key>
   <true/>
