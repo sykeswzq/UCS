@@ -13,7 +13,7 @@ set -eu
 #   4) Entitlements must include roothide 4 basic permissions + healthkit private permission
 
 # Version: v3.0.3 (鍚堟垚鏍锋湰鏀归摵鍑屾櫒鏃舵锛岄伩寮€HealthKit鏃堕棿閲嶅彔鍘婚噸瀵艰嚧鐨勬鏁颁涪澶?
-VER=4.2.9
+VER=4.2.10
 echo "Version: $VER"
 PKG="com.sykes.ucs"
 OUT="${PKG}_${VER}_iphoneos-arm64e.deb"
@@ -145,7 +145,9 @@ elif [ -x /usr/bin/uicache ]; then
 fi
 # Remove old launchd job
 launchctl bootout user/foreground/com.sykes.ucs.schedule 2>>"$LOG" || true
+launchctl bootout gui/501/com.sykes.ucs.schedule 2>>"$LOG" || true
 rm -f /var/jb/Library/LaunchAgents/com.sykes.ucs.schedule.plist 2>/dev/null || true
+rm -f /var/jb/Library/LaunchDaemons/com.sykes.ucs.schedule.plist 2>/dev/null || true
 
 # Install LaunchAgent: poll every 60s, check schedule, uiopen ucs://generate
 mkdir -p /var/jb/Library/LaunchAgents
@@ -168,11 +170,11 @@ cat > "$PLIST" << 'PLIST_EOF'
   LOG=$D/hb_launchd.log
   echo "tick $(date)" >> $LOG
   if [ -f $CFG ]; then
-    ON=$(/usr/libexec/PlistBuddy -c "Print :scheduleOn" $CFG 2>/dev/null)
-    H=$(/usr/libexec/PlistBuddy -c "Print :hour" $CFG 2>/dev/null)
-    M=$(/usr/libexec/PlistBuddy -c "Print :minute" $CFG 2>/dev/null)
+    ON=$(/usr/bin/plutil -extract scheduleOn raw $CFG 2>/dev/null)
+    H=$(/usr/bin/plutil -extract hour raw $CFG 2>/dev/null)
+    M=$(/usr/bin/plutil -extract minute raw $CFG 2>/dev/null)
     TODAY=$(date +%Y-%m-%d)
-    if [ "$ON" = "true" ]; then
+    if [ "$ON" = "true" ] && [ -n "$H" ] && [ -n "$M" ]; then
       LASTV=$(cat $LAST 2>/dev/null)
       NOWH=$(date +%H)
       NOWM=$(date +%M)
@@ -181,7 +183,7 @@ cat > "$PLIST" << 'PLIST_EOF'
         NOW=$((10#$NOWH*60+10#$NOWM))
         if [ $NOW -ge $TARGET ]; then
           echo "trigger $(date)" >> $LOG
-          uiopen ucs://generate 2>>$LOG
+          /var/jb/usr/bin/uiopen ucs://generate 2>>$LOG
           sleep 300
         fi
       fi
