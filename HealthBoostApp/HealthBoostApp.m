@@ -831,7 +831,6 @@ static NSString * const HBNotifRequestedKey = @"hb_notif_requested";
     HBLog(@"[UCS] updateLaunchdPlist: skip (script reads nexttime)");
 }
 
-}
 
 - (void)updateStatus:(NSString *)text { self.statusLabel.text = text; }
 - (void)dismissKeyboard {}
