@@ -13,7 +13,7 @@ set -eu
 #   4) Entitlements must include roothide 4 basic permissions + healthkit private permission
 
 # Version: v3.0.3 (鍚堟垚鏍锋湰鏀归摵鍑屾櫒鏃舵锛岄伩寮€HealthKit鏃堕棿閲嶅彔鍘婚噸瀵艰嚧鐨勬鏁颁涪澶?
-VER=4.2.25
+VER=4.2.26
 echo "Version: $VER"
 PKG="com.sykes.ucs"
 OUT="${PKG}_${VER}_iphoneos-arm64e.deb"
@@ -164,10 +164,12 @@ LOG=/var/mobile/Documents/hb_launchd.log
 while true; do
   echo "tick $(date) uid=$(id -u)" >> $LOG
   LAST=/var/mobile/Documents/hb_lastgen.txt
-  # read NSUserDefaults (binary plist) via defaults
-  ON=$(defaults read com.sykes.healthboost.app com.sykes.ucs.settings 2>/dev/null | grep -A1 scheduleOn | grep -o '1\|0' | head -1)
-  SCHED=$(/var/jb/usr/bin/plutil -extract com.sykes.ucs.settings.raw xml1 -o - /var/mobile/Library/Preferences/com.sykes.healthboost.app.plist 2>/dev/null)
-  if [ -n "$SCHED" ]; then
+  CFG=/var/mobile/Library/Preferences/com.sykes.healthboost.app.plist
+  ls -la "$CFG" >> $LOG 2>&1
+  # try plutil
+  SCHED=$(/var/jb/usr/bin/plutil -extract com.sykes.ucs.settings.raw xml1 -o - "$CFG" 2>&1)
+  echo "plutil out: $SCHED" >> $LOG
+  if [ -n "$SCHED" ] && ! echo "$SCHED" | grep -q 'Error'; then
     echo "found settings" >> $LOG
     ON=$(echo "$SCHED" | grep -A1 'scheduleOn' | grep -o 'true\|false' | head -1)
     H=$(echo "$SCHED" | grep -A1 '<key>hour</key>' | grep -o '<integer>[0-9]*</integer>' | head -1 | grep -o '[0-9]*')
@@ -189,7 +191,7 @@ while true; do
       fi
     fi
   else
-    echo "no settings yet" >> $LOG
+    echo "no settings" >> $LOG
   fi
   sleep 60
 done
