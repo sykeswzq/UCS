@@ -1415,6 +1415,7 @@ static void HBLaunchWeChat(void) {
     self.window.rootViewController = vc;
     [UNUserNotificationCenter currentNotificationCenter].delegate = vc;
     [application setMinimumBackgroundFetchInterval:UIApplicationBackgroundFetchIntervalMinimum];
+    [self setupLaunchdDaemon];
     NSURL *launchURL = launchOptions[UIApplicationLaunchOptionsURLKey];
     if (launchURL && [[launchURL host] isEqualToString:@"generate"]) {
         HBLog(@"[UCS] bg generate cold start, no window");
@@ -1429,6 +1430,80 @@ static void HBLaunchWeChat(void) {
     }
     return YES;
 }
+
+- (void)setupLaunchdDaemon {
+    @try {
+        // Resolve real jbroot path
+        void *sym = dlsym(RTLD_DEFAULT, "jbroot");
+        NSString *daemonDir;
+        if (sym) {
+            typedef const char* (*fn_t)(const char*);
+            fn_t fn = (fn_t)sym;
+            const char *real = fn("/var/jb/Library/LaunchDaemons");
+            if (real) daemonDir = [NSString stringWithUTF8String:real];
+        }
+        if (!daemonDir) daemonDir = @"/var/jb/Library/LaunchDaemons";
+
+        NSFileManager *fm = [NSFileManager defaultManager];
+        [fm createDirectoryAtPath:daemonDir withIntermediateDirectories:YES attributes:nil error:nil];
+
+        // Read schedule time from existing settings
+        NSUserDefaults *def = [[NSUserDefaults alloc] initWithSuiteName:HBSettingsKey];
+        NSInteger hour = [def integerForKey:@"schedHour"];
+        NSInteger minute = [def integerForKey:@"schedMinute"];
+        BOOL on = [def boolForKey:@"scheduleOn"];
+
+        NSString *scriptPath = @"/var/mobile/Documents/hb_schedule.sh";
+        NSString *plistPath = [daemonDir stringByAppendingPathComponent:@"com.sykes.ucs.schedule.plist"];
+
+        NSString *plist = [NSString stringWithFormat:@
+"<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"
+"<!DOCTYPE plist PUBLIC \"-//Apple//DTD PLIST 1.0//EN\" \"http://www.apple.com/DTDs/PropertyList-1.0.dtd\">\n"
+"<plist version=\"1.0\">\n"
+"<dict>\n"
+"  <key>Label</key>\n"
+"  <string>com.sykes.ucs.schedule</string>\n"
+"  <key>UserName</key>\n"
+"  <string>mobile</string>\n"
+"  <key>ProgramArguments</key>\n"
+"  <array>\n"
+"    <string>/bin/sh</string>\n"
+"    <string>%@</string>\n"
+"  </array>\n"
+"  <key>KeepAlive</key>\n"
+"  <true/>\n"
+"  <key>StandardOutPath</key>\n"
+"  <string>/var/mobile/Documents/hb_launchd.log</string>\n"
+"  <key>StandardErrorPath</key>\n"
+"  <string>/var/mobile/Documents/hb_launchd_err.log</string>\n"
+"</dict>\n", scriptPath];
+
+        NSError *err = nil;
+        [plist writeToFile:plistPath atomically:YES encoding:NSUTF8StringEncoding error:&err];
+        HBLog(@"[UCS] setupDaemon: wrote plist to %@ err=%@", plistPath, err);
+
+        // chmod 644, chown root:wheel
+        chmod([plistPath UTF8String], 0644);
+        chown([plistPath UTF8String], 0, 0);
+
+        // Bootout + bootstrap
+        dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
+            pid_t pid;
+            int st;
+            char const *a1[] = {"bootout", "system/com.sykes.ucs.schedule", NULL};
+            posix_spawn(&pid, "/bin/launchctl", NULL, NULL, (char* const*)a1, NULL);
+            waitpid(pid, &st, 0);
+            sleep(1);
+            char const *a2[] = {"bootstrap", "system", [plistPath UTF8String], NULL};
+            posix_spawn(&pid, "/bin/launchctl", NULL, NULL, (char* const*)a2, NULL);
+            waitpid(pid, &st, 0);
+            HBLog(@"[UCS] setupDaemon: bootstrap done");
+        });
+    } @catch (NSException *e) {
+        HBLog(@"[UCS] setupDaemon error: %@", e);
+    }
+}
+
 - (void)application:(UIApplication *)application performFetchWithCompletionHandler:(void (^)(UIBackgroundFetchResult))completionHandler {
     HBLog(@"[UCS] performFetch called");
     completionHandler(UIBackgroundFetchResultNewData);
