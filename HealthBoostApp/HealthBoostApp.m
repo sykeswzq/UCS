@@ -1357,7 +1357,15 @@ static void HBLaunchWeChat(void) {
     [self.window makeKeyAndVisible];
     // 尽早设置通知delegate，防止冷启动时通知到达但delegate未设置
     [UNUserNotificationCenter currentNotificationCenter].delegate = vc;
+    // 注册后台fetch，系统会不定时唤醒App检查定时
+    [application setMinimumBackgroundFetchInterval:UIApplicationBackgroundFetchIntervalMinimum];
     return YES;
+}
+- (void)application:(UIApplication *)application performFetchWithCompletionHandler:(void (^)(UIBackgroundFetchResult))completionHandler {
+    HBLog(@"[UCS] performFetch called");
+    HBMainViewController *vc = (HBMainViewController *)self.window.rootViewController;
+    [vc checkAndCatchUpGeneration];
+    completionHandler(UIBackgroundFetchResultNewData);
 }
 @end
 
