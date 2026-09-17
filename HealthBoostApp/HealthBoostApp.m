@@ -1304,7 +1304,10 @@ static void HBLaunchWeChat(void) {
     [HBTodayString() writeToFile:HBLastGenPath() atomically:YES encoding:NSUTF8StringEncoding error:nil];
     [HBTodayString() writeToFile:@"/var/mobile/Documents/hb_lastgen.txt" atomically:YES encoding:NSUTF8StringEncoding error:nil];
     if (self.autoCatchUp) {
-        HBLog(@"[UCS] background generate done, will suspend");
+        HBLog(@"[UCS] background generate done, exiting");
+        dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(2.0 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+            exit(0);
+        });
         return;
     }
     dispatch_async(dispatch_get_main_queue(), ^{
