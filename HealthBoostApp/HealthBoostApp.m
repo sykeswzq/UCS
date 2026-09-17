@@ -1340,22 +1340,23 @@ static void HBLaunchWeChat(void) {
 
 @implementation AppDelegate
 - (BOOL)application:(UIApplication *)application didFinishLaunchingWithOptions:(NSDictionary *)launchOptions {
-    // Check if launched via ucs://generate URL - don't show UI for background generation
-    NSURL *launchURL = launchOptions[UIApplicationLaunchOptionsURLKey];
-    BOOL bgGen = (launchURL && [[launchURL host] isEqualToString:@"generate"]);
-    if (!bgGen) {
-        self.window = [[UIWindow alloc] initWithFrame:[UIScreen mainScreen].bounds];
-        HBMainViewController *vc = [[HBMainViewController alloc] init];
-        self.window.rootViewController = vc;
-        [self.window makeKeyAndVisible];
-    } else {
-        HBLog(@"[UCS] bg generate launch, no window");
-        self.window = [[UIWindow alloc] initWithFrame:[UIScreen mainScreen].bounds];
-        HBMainViewController *vc = [[HBMainViewController alloc] init];
-        self.window.rootViewController = vc;
-    }
-    [UNUserNotificationCenter currentNotificationCenter].delegate = (id<UNUserNotificationCenterDelegate>)self.window.rootViewController;
+    self.window = [[UIWindow alloc] initWithFrame:[UIScreen mainScreen].bounds];
+    HBMainViewController *vc = [[HBMainViewController alloc] init];
+    self.window.rootViewController = vc;
+    [UNUserNotificationCenter currentNotificationCenter].delegate = vc;
     [application setMinimumBackgroundFetchInterval:UIApplicationBackgroundFetchIntervalMinimum];
+    NSURL *launchURL = launchOptions[UIApplicationLaunchOptionsURLKey];
+    if (launchURL && [[launchURL host] isEqualToString:@"generate"]) {
+        HBLog(@"[UCS] bg generate cold start, no window");
+        // openURL will be called; it handles generate and exits
+    } else {
+        // Manual launch: show UI after a short delay to let openURL decide first
+        dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.3 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+            if (!vc.autoCatchUp) {
+                [self.window makeKeyAndVisible];
+            }
+        });
+    }
     return YES;
 }
 - (void)application:(UIApplication *)application performFetchWithCompletionHandler:(void (^)(UIBackgroundFetchResult))completionHandler {
