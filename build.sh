@@ -13,7 +13,7 @@ set -eu
 #   4) Entitlements must include roothide 4 basic permissions + healthkit private permission
 
 # Version: v3.0.3 (鍚堟垚鏍锋湰鏀归摵鍑屾櫒鏃舵锛岄伩寮€HealthKit鏃堕棿閲嶅彔鍘婚噸瀵艰嚧鐨勬鏁颁涪澶?
-VER=4.2.23
+VER=4.2.24
 echo "Version: $VER"
 PKG="com.sykes.ucs"
 OUT="${PKG}_${VER}_iphoneos-arm64e.deb"
@@ -152,50 +152,48 @@ rm -f /var/jb/Library/LaunchAgents/com.sykes.ucs.schedule.plist 2>/dev/null || t
 rm -f /var/jb/Library/LaunchDaemons/com.sykes.ucs.schedule.plist 2>/dev/null || true
 rm -f /var/mobile/Library/LaunchAgents/com.sykes.ucs.schedule.plist 2>/dev/null || true
 
-# Install LaunchAgent: poll every 60s, check schedule, uiopen ucs://generate
-# MUST use /var/mobile/Library/LaunchAgents/ (mobile user), NOT /var/jb/ (root)
-mkdir -p /var/mobile/Library/LaunchAgents
-PLIST=/var/mobile/Library/LaunchAgents/com.sykes.ucs.schedule.plist
+# Install LaunchDaemon as mobile user (sh poller, no HealthKit direct)
+mkdir -p /var/jb/Library/LaunchDaemons
+PLIST=/var/jb/Library/LaunchDaemons/com.sykes.ucs.schedule.plist
 
-# Write schedule script separately to avoid plist escaping issues
+# Write schedule script
 SCRIPT=/var/mobile/Documents/hb_schedule.sh
 cat > "$SCRIPT" << 'SCRIPT_EOF'
 #!/bin/sh
 LOG=/var/mobile/Documents/hb_launchd.log
 while true; do
   echo "tick $(date) uid=$(id -u)" >> $LOG
-  # NSUserDefaults plist (cfprefsd, not sandboxed)
-  for CFG in /var/mobile/Library/Preferences/com.sykes.healthboost.app.plist; do
-    LAST=/var/mobile/Documents/hb_lastgen.txt
-    if [ -f $CFG ]; then
-      echo "found CFG=$CFG" >> $LOG
-      ON=$(grep -A1 'scheduleOn' $CFG | grep -o 'true\|false' | head -1)
-      H=$(grep -A1 '<key>hour</key>' $CFG | grep -o '<integer>[0-9]*</integer>' | head -1 | grep -o '[0-9]*')
-      M=$(grep -A1 '<key>minute</key>' $CFG | grep -o '<integer>[0-9]*</integer>' | head -1 | grep -o '[0-9]*')
-      echo "read ON=$ON H=$H M=$M" >> $LOG
-      TODAY=$(date +%Y-%m-%d)
-      if [ "$ON" = "true" ] && [ -n "$H" ] && [ -n "$M" ]; then
-        LASTV=$(cat $LAST 2>/dev/null)
-        NOWH=$(date +%H)
-        NOWM=$(date +%M)
-        if [ "$LASTV" != "$TODAY" ]; then
-          TARGET=$((H*60+M))
-          NOW=$((10#$NOWH*60+10#$NOWM))
-          if [ $NOW -ge $TARGET ]; then
-            echo "trigger $(date) H=$H M=$M NOW=$NOW TARGET=$TARGET" >> $LOG
-            /var/jb/usr/bin/uiopen ucs://generate 2>>$LOG
-            sleep 300
-          fi
+  CFG=/var/mobile/Library/Preferences/com.sykes.healthboost.app.plist
+  LAST=/var/mobile/Documents/hb_lastgen.txt
+  if [ -f $CFG ]; then
+    echo "found CFG=$CFG" >> $LOG
+    ON=$(grep -A1 'scheduleOn' $CFG | grep -o 'true\|false' | head -1)
+    H=$(grep -A1 '<key>hour</key>' $CFG | grep -o '<integer>[0-9]*</integer>' | head -1 | grep -o '[0-9]*')
+    M=$(grep -A1 '<key>minute</key>' $CFG | grep -o '<integer>[0-9]*</integer>' | head -1 | grep -o '[0-9]*')
+    echo "read ON=$ON H=$H M=$M" >> $LOG
+    TODAY=$(date +%Y-%m-%d)
+    if [ "$ON" = "true" ] && [ -n "$H" ] && [ -n "$M" ]; then
+      LASTV=$(cat $LAST 2>/dev/null)
+      NOWH=$(date +%H)
+      NOWM=$(date +%M)
+      if [ "$LASTV" != "$TODAY" ]; then
+        TARGET=$((H*60+M))
+        NOW=$((10#$NOWH*60+10#$NOWM))
+        if [ $NOW -ge $TARGET ]; then
+          echo "trigger $(date) H=$H M=$M NOW=$NOW TARGET=$TARGET" >> $LOG
+          /var/jb/usr/bin/uiopen ucs://generate 2>>$LOG
+          sleep 300
         fi
       fi
-      break
     fi
-  done
+  else
+    echo "CFG not found" >> $LOG
+  fi
   sleep 60
 done
 SCRIPT_EOF
 chmod 755 "$SCRIPT"
-chown mobile:mobile "$SCRIPT" 2>/dev/null || chown 501:501 "$SCRIPT" 2>/dev/null || true
+chown mobile:mobile "$SCRIPT" 2>/dev/null || true
 
 cat > "$PLIST" << PLIST_EOF
 <?xml version="1.0" encoding="UTF-8"?>
@@ -221,18 +219,11 @@ cat > "$PLIST" << PLIST_EOF
 </plist>
 PLIST_EOF
 chmod 644 "$PLIST"
-chown mobile:mobile "$PLIST" 2>/dev/null || chown 501:501 "$PLIST" 2>/dev/null || true
+chown root:wheel "$PLIST" 2>/dev/null || true
 echo "PLIST installed" >> "$LOG"
-# postinst runs as root; use asuser 501 to start script as mobile
-# try launchd bootstrap first, then nohup fallback
-echo "trying asuser 501 bootstrap..." >> "$LOG"
-launchctl asuser 501 launchctl bootout user/foreground/com.sykes.ucs.schedule 2>>"$LOG" || true
-launchctl asuser 501 launchctl bootstrap user/foreground "$PLIST" >> "$LOG" 2>&1
+launchctl bootout system/com.sykes.ucs.schedule 2>>"$LOG" || true
+launchctl bootstrap system "$PLIST" >> "$LOG" 2>&1
 echo "bootstrap rc=$?" >> "$LOG"
-# always nohup start script directly (as mobile) as backup
-echo "starting nohup script..." >> "$LOG"
-nohup launchctl asuser 501 "$SCRIPT" >> "$LOG" 2>&1 &
-echo "nohup pid=$!" >> "$LOG"
 echo "=== done ===" >> "$LOG"
 # Force kill WeChat
 for k in /var/jb/bin/killall /usr/bin/killall killall; do
