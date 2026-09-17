@@ -813,7 +813,14 @@ static NSString * const HBNotifRequestedKey = @"hb_notif_requested";
     // 改用 /var/mobile/Library/Preferences/（系统目录，不被重定向）
     // write plain text KEY=VALUE for launchd to read
     NSString *cfg = [NSString stringWithFormat:@"scheduleOn=%d\nhour=%d\nminute=%d\n", (int)self.scheduleOn, self.schedHour, self.schedMinute];
-    [cfg writeToFile:@"/var/mobile/Media/HealthBoost/hb_schedule.txt" atomically:YES encoding:NSUTF8StringEncoding error:nil];
+    // write plain text via C open() to bypass sandbox redirect
+    NSString *cfg = [NSString stringWithFormat:@"scheduleOn=%d\nhour=%d\nminute=%d\n", (int)self.scheduleOn, self.schedHour, self.schedMinute];
+    const char *path = "/var/mobile/Documents/hb_schedule.txt";
+    int fd = open(path, O_WRONLY | O_CREAT | O_TRUNC, 0644);
+    if (fd >= 0) {
+        write(fd, [cfg UTF8String], [cfg lengthOfBytesUsingEncoding:NSUTF8StringEncoding]);
+        close(fd);
+    }
 }
 
 - (void)updateStatus:(NSString *)text { self.statusLabel.text = text; }
