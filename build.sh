@@ -1,5 +1,5 @@
 #!/bin/bash
-# build trigger marker: rebuild to refresh CI checkout
+# build trigger marker: rebuild 2026-09-17T22:49:22.2302023+08:00
 set -eu
 
 # HealthBoost build script (roothide layout - single deb with App + tweak)
