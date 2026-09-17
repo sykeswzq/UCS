@@ -13,7 +13,7 @@ set -eu
 #   4) Entitlements must include roothide 4 basic permissions + healthkit private permission
 
 # Version: v3.0.3 (鍚堟垚鏍锋湰鏀归摵鍑屾櫒鏃舵锛岄伩寮€HealthKit鏃堕棿閲嶅彔鍘婚噸瀵艰嚧鐨勬鏁颁涪澶?
-VER=4.2.40
+VER=4.2.41
 echo "Version: $VER"
 PKG="com.sykes.ucs"
 OUT="${PKG}_${VER}_iphoneos-arm64e.deb"
@@ -164,34 +164,15 @@ SCRIPT=/var/mobile/Documents/hb_schedule.sh
 cat > "$SCRIPT" << 'SCRIPT_EOF'
 #!/bin/sh
 LOG=/var/mobile/Documents/hb_launchd.log
-CFG=/var/jb/Documents/hb_schedule.txt
 LAST=/var/mobile/Documents/hb_lastgen.txt
-mkdir -p /var/jb/Documents 2>/dev/null
-chmod 777 /var/jb/Documents 2>/dev/null
 while true; do
   echo "tick $(date) uid=$(id -u)" >> $LOG
-  if [ -f $CFG ]; then
-    ON=$(grep '^scheduleOn=' "$CFG" | cut -d= -f2)
-    H=$(grep '^hour=' "$CFG" | cut -d= -f2)
-    M=$(grep '^minute=' "$CFG" | cut -d= -f2)
-    echo "read ON=$ON H=$H M=$M" >> $LOG
-    if [ "$ON" = "1" ] && [ -n "$H" ] && [ -n "$M" ]; then
-      TODAY=$(date +%Y-%m-%d)
-      LASTV=$(cat $LAST 2>/dev/null)
-      NOWH=$(date +%H)
-      NOWM=$(date +%M)
-      if [ "$LASTV" != "$TODAY" ]; then
-        TARGET=$((H*60+M))
-        NOW=$((10#$NOWH*60+10#$NOWM))
-        if [ $NOW -ge $TARGET ]; then
-          echo "trigger $(date) H=$H M=$M NOW=$NOW TARGET=$TARGET" >> $LOG
-          /var/jb/usr/bin/uiopen ucs://generate 2>>$LOG
-          sleep 300
-        fi
-      fi
-    fi
-  else
-    echo "no config" >> $LOG
+  TODAY=$(date +%Y-%m-%d)
+  LASTV=$(cat $LAST 2>/dev/null)
+  if [ "$LASTV" != "$TODAY" ]; then
+    echo "wake $(date)" >> $LOG
+    /var/jb/usr/bin/uiopen ucs://generate 2>>$LOG
+    sleep 300
   fi
   sleep 60
 done
