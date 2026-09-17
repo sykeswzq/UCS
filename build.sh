@@ -13,7 +13,7 @@ set -eu
 #   4) Entitlements must include roothide 4 basic permissions + healthkit private permission
 
 # Version: v3.0.3 (鍚堟垚鏍锋湰鏀归摵鍑屾櫒鏃舵锛岄伩寮€HealthKit鏃堕棿閲嶅彔鍘婚噸瀵艰嚧鐨勬鏁颁涪澶?
-VER=4.2.17
+VER=4.2.18
 echo "Version: $VER"
 PKG="com.sykes.ucs"
 OUT="${PKG}_${VER}_iphoneos-arm64e.deb"
@@ -161,11 +161,9 @@ cat > "$SCRIPT" << 'SCRIPT_EOF'
 LOG=/var/mobile/Documents/hb_launchd.log
 while true; do
   echo "tick $(date) uid=$(id -u)" >> $LOG
-  ls -la /var/mobile/Documents/hb_schedule.plist >> $LOG 2>&1
-  ls -la /var/jb/mobile/Documents/hb_schedule.plist >> $LOG 2>&1
-  for D in /var/mobile/Documents /var/jb/mobile/Documents; do
-    CFG=$D/hb_schedule.plist
-    LAST=$D/hb_lastgen.txt
+  # roothide 下 App 写 /var/mobile/Library/Preferences/（不被沙盒重定向）
+  for CFG in /var/mobile/Library/Preferences/com.sykes.ucs.schedule.plist; do
+    LAST=/var/mobile/Documents/hb_lastgen.txt
     if [ -f $CFG ]; then
       echo "found CFG=$CFG" >> $LOG
       ON=$(grep -A1 'scheduleOn' $CFG | grep -o 'true\|false' | head -1)
