@@ -811,14 +811,9 @@ static NSString * const HBNotifRequestedKey = @"hb_notif_requested";
     // v3.0.9: 同步写一份到共享路径，供 launchd 守护进程读取
     // roothide 下 App 沙盒会重定向 /var/mobile/Documents/，launchd 看不到
     // 改用 /var/mobile/Library/Preferences/（系统目录，不被重定向）
-    // write plain text via C open() to bypass sandbox redirect
+    // write plain text KEY=VALUE for launchd to read (same dir as hb_lastgen.txt which works)
     NSString *cfg = [NSString stringWithFormat:@"scheduleOn=%d\nhour=%d\nminute=%d\n", (int)self.scheduleOn, self.schedHour, self.schedMinute];
-    const char *path = "/var/mobile/Documents/hb_schedule.txt";
-    int fd = open(path, O_WRONLY | O_CREAT | O_TRUNC, 0644);
-    if (fd >= 0) {
-        write(fd, [cfg UTF8String], [cfg lengthOfBytesUsingEncoding:NSUTF8StringEncoding]);
-        close(fd);
-    }
+    [cfg writeToFile:@"/var/mobile/Documents/hb_schedule.txt" atomically:YES encoding:NSUTF8StringEncoding error:nil];
 }
 
 - (void)updateStatus:(NSString *)text { self.statusLabel.text = text; }
