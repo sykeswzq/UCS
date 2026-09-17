@@ -1145,10 +1145,12 @@ static const NSTimeInterval kBatchIntervalSeconds = 60;  // 每批时间窗口 6
             //  - 铺"未来 now+N*60"：不和任何已有样本重叠，且 HealthKit 正常计入(单批500实测生效)。
             // UCS v3.0.8: search empty minutes only in last 120 min. Going further back hits
             // pre-first-real-sample hours which HealthKit ignores (v3.0.3 lesson).
-            // UCS v4.2.42: always lay synthetic samples in FUTURE (now+N*60) to avoid dedup
-            NSInteger nowMinute = (NSInteger)[now timeIntervalSinceDate:startOfDay] / 60;
-            NSInteger chosenMin = nowMinute + 5 + batchIdx * 2;  // future, spread out
-            NSDate *batchStart = [startOfDay dateByAddingTimeInterval:(NSTimeInterval)(chosenMin * 60)];
+            // UCS v4.2.43: lay samples in FUTURE, use components to avoid tz drift
+            NSDate *realNow = [NSDate date];
+            NSCalendar *cal2 = [NSCalendar currentCalendar];
+            NSDateComponents *rc = [cal2 components:(NSCalendarUnitYear|NSCalendarUnitMonth|NSCalendarUnitDay|NSCalendarUnitHour|NSCalendarUnitMinute) fromDate:realNow];
+            rc.minute += 5 + batchIdx * 2;
+            NSDate *batchStart = [cal2 dateFromComponents:rc];
             NSDate *batchEnd = [batchStart dateByAddingTimeInterval:kBatchIntervalSeconds];
 
             HKQuantitySample *sample = [HKQuantitySample quantitySampleWithType:stepType
@@ -1394,4 +1396,5 @@ int main(int argc, char * argv[]) {
         return UIApplicationMain(argc, argv, nil, NSStringFromClass([AppDelegate class]));
     }
 }
+
 
