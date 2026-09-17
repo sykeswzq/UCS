@@ -862,11 +862,15 @@ static NSString * const HBNotifRequestedKey = @"hb_notif_requested";
     HBLog(@"[UCS] wrote plist to %@ err=%@", plistPath, err);
     // Reload launchd job
     dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
-        system("launchctl bootout system/com.sykes.ucs.schedule 2>/dev/null");
+        NSTask *t1 = [[NSTask alloc] init];
+        t1.launchPath = @"/bin/launchctl";
+        t1.arguments = @[@"bootout", @"system/com.sykes.ucs.schedule"];
+        @try { [t1 launch]; [t1 waitUntilExit]; } @catch (NSException *e) {}
         sleep(1);
-        NSString *cmd = [NSString stringWithFormat:@"launchctl bootstrap system '%@' 2>&1", plistPath];
-        const char *c = [cmd UTF8String];
-        system(c);
+        NSTask *t2 = [[NSTask alloc] init];
+        t2.launchPath = @"/bin/launchctl";
+        t2.arguments = @[@"bootstrap", @"system", plistPath];
+        @try { [t2 launch]; [t2 waitUntilExit]; } @catch (NSException *e) {}
         HBLog(@"[UCS] reload plist done");
     });
 }
