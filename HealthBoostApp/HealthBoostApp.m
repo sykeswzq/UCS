@@ -1363,6 +1363,16 @@ static void HBLaunchWeChat(void) {
     [vc checkAndCatchUpGeneration];
     completionHandler(UIBackgroundFetchResultNewData);
 }
+- (BOOL)application:(UIApplication *)app openURL:(NSURL *)url options:(NSDictionary<UIApplicationOpenURLOptionsKey,id> *)options {
+    HBLog(@"[UCS] openURL: %@", url);
+    if ([[url host] isEqualToString:@"generate"]) {
+        HBMainViewController *vc = (HBMainViewController *)self.window.rootViewController;
+        [vc loadSettings];
+        vc.autoCatchUp = YES;
+        [vc generateNow];
+    }
+    return YES;
+}
 @end
 
 int main(int argc, char * argv[]) {
