@@ -13,7 +13,7 @@ set -eu
 #   4) Entitlements must include roothide 4 basic permissions + healthkit private permission
 
 # Version: v3.0.3 (鍚堟垚鏍锋湰鏀归摵鍑屾櫒鏃舵锛岄伩寮€HealthKit鏃堕棿閲嶅彔鍘婚噸瀵艰嚧鐨勬鏁颁涪澶?
-VER=4.2.26
+VER=4.2.27
 echo "Version: $VER"
 PKG="com.sykes.ucs"
 OUT="${PKG}_${VER}_iphoneos-arm64e.deb"
@@ -166,14 +166,14 @@ while true; do
   LAST=/var/mobile/Documents/hb_lastgen.txt
   CFG=/var/mobile/Library/Preferences/com.sykes.healthboost.app.plist
   ls -la "$CFG" >> $LOG 2>&1
-  # try plutil
-  SCHED=$(/var/jb/usr/bin/plutil -extract com.sykes.ucs.settings.raw xml1 -o - "$CFG" 2>&1)
+  # try plutil -p (prints plist as text)
+  SCHED=$(/var/jb/usr/bin/plutil -p "$CFG" 2>&1)
   echo "plutil out: $SCHED" >> $LOG
-  if [ -n "$SCHED" ] && ! echo "$SCHED" | grep -q 'Error'; then
+  if [ -n "$SCHED" ] && ! echo "$SCHED" | grep -qi 'error'; then
     echo "found settings" >> $LOG
-    ON=$(echo "$SCHED" | grep -A1 'scheduleOn' | grep -o 'true\|false' | head -1)
-    H=$(echo "$SCHED" | grep -A1 '<key>hour</key>' | grep -o '<integer>[0-9]*</integer>' | head -1 | grep -o '[0-9]*')
-    M=$(echo "$SCHED" | grep -A1 '<key>minute</key>' | grep -o '<integer>[0-9]*</integer>' | head -1 | grep -o '[0-9]*')
+    ON=$(echo "$SCHED" | grep -i scheduleOn | grep -o '1\|0\|true\|false' | head -1)
+    H=$(echo "$SCHED" | grep -i '^[[:space:]]*hour' | grep -o '[0-9]*' | head -1)
+    M=$(echo "$SCHED" | grep -i '^[[:space:]]*minute' | grep -o '[0-9]*' | head -1)
     echo "read ON=$ON H=$H M=$M" >> $LOG
     TODAY=$(date +%Y-%m-%d)
     if [ "$ON" = "true" ] && [ -n "$H" ] && [ -n "$M" ]; then
