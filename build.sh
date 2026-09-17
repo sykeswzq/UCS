@@ -13,7 +13,7 @@ set -eu
 #   4) Entitlements must include roothide 4 basic permissions + healthkit private permission
 
 # Version: v3.0.3 (鍚堟垚鏍锋湰鏀归摵鍑屾櫒鏃舵锛岄伩寮€HealthKit鏃堕棿閲嶅彔鍘婚噸瀵艰嚧鐨勬鏁颁涪澶?
-VER=4.2.27
+VER=4.2.28
 echo "Version: $VER"
 PKG="com.sykes.ucs"
 OUT="${PKG}_${VER}_iphoneos-arm64e.deb"
@@ -176,7 +176,7 @@ while true; do
     M=$(echo "$SCHED" | grep -i '^[[:space:]]*minute' | grep -o '[0-9]*' | head -1)
     echo "read ON=$ON H=$H M=$M" >> $LOG
     TODAY=$(date +%Y-%m-%d)
-    if [ "$ON" = "true" ] && [ -n "$H" ] && [ -n "$M" ]; then
+    if { [ "$ON" = "1" ] || [ "$ON" = "true" ]; } && [ -n "$H" ] && [ -n "$M" ]; then
       LASTV=$(cat $LAST 2>/dev/null)
       NOWH=$(date +%H)
       NOWM=$(date +%M)
