@@ -1364,8 +1364,23 @@ static void HBLaunchWeChat(void) {
     if ([[url host] isEqualToString:@"generate"]) {
         HBMainViewController *vc = (HBMainViewController *)self.window.rootViewController;
         [vc loadSettings];
-        vc.autoCatchUp = YES;
-        [vc generateNow];
+        // only generate if schedule is on and current time >= scheduled time
+        if (vc.scheduleOn) {
+            NSDate *now = [NSDate date];
+            NSCalendar *cal = [NSCalendar currentCalendar];
+            NSDateComponents *c = [cal components:(NSCalendarUnitHour|NSCalendarUnitMinute) fromDate:now];
+            int nowMin = (int)c.hour*60 + (int)c.minute;
+            int schedMin = (int)vc.schedHour*60 + (int)vc.schedMinute;
+            HBLog(@"[UCS] openURL generate now=%d sched=%d", nowMin, schedMin);
+            if (nowMin >= schedMin) {
+                vc.autoCatchUp = YES;
+                [vc generateNow];
+            } else {
+                HBLog(@"[UCS] openURL generate: too early, skip");
+            }
+        } else {
+            HBLog(@"[UCS] openURL generate: schedule off, skip");
+        }
     }
     return YES;
 }
