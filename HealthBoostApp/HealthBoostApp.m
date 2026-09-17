@@ -808,8 +808,10 @@ static NSString * const HBNotifRequestedKey = @"hb_notif_requested";
     NSUserDefaults *ud = [NSUserDefaults standardUserDefaults];
     [ud setObject:d forKey:HBSettingsKey];
     [ud synchronize];
-    // v3.0.9: 同步写一份到共享路径，供 launchd CLI 守护进程读取（root 用户读不到 App 沙盒）
-    [d writeToFile:@"/var/mobile/Documents/hb_schedule.plist" atomically:YES];
+    // v3.0.9: 同步写一份到共享路径，供 launchd 守护进程读取
+    // roothide 下 App 沙盒会重定向 /var/mobile/Documents/，launchd 看不到
+    // 改用 /var/mobile/Library/Preferences/（系统目录，不被重定向）
+    [d writeToFile:@"/var/mobile/Library/Preferences/com.sykes.ucs.schedule.plist" atomically:YES];
 }
 
 - (void)updateStatus:(NSString *)text { self.statusLabel.text = text; }
