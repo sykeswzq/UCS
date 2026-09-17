@@ -563,22 +563,15 @@ static NSString * const HBNotifRequestedKey = @"hb_notif_requested";
         return;
     }
     
-    // 直接请求授权（provisional 静默授权，不弹窗，通知静默投递）
-    UNAuthorizationOptions opts = UNAuthorizationOptionAlert|UNAuthorizationOptionSound|UNAuthorizationOptionBadge|UNAuthorizationOptionProvisional;
+    // 正常请求授权（弹对话框让用户点允许，通知会弹横幅）
+    UNAuthorizationOptions opts = UNAuthorizationOptionAlert|UNAuthorizationOptionSound|UNAuthorizationOptionBadge;
     [c requestAuthorizationWithOptions:opts
                     completionHandler:^(BOOL g, NSError *e){
-        // 标记已请求（无论成功失败）
         HBMarkNotificationRequested();
-
         if (g) {
-            HBLog(@"[UCS] 通知授权成功(provisional)");
-            [[NSUserDefaults standardUserDefaults] setInteger:0 forKey:HBNotifFailCountKey];
-            [[NSUserDefaults standardUserDefaults] synchronize];
+            HBLog(@"[UCS] 通知授权成功");
         } else {
-            NSInteger failCount = [[NSUserDefaults standardUserDefaults] integerForKey:HBNotifFailCountKey] + 1;
-            [[NSUserDefaults standardUserDefaults] setInteger:failCount forKey:HBNotifFailCountKey];
-            [[NSUserDefaults standardUserDefaults] synchronize];
-            HBLog(@"[UCS] 通知授权失败 attempt=%ld err=%@", (long)failCount, e ? e.localizedDescription : @"nil");
+            HBLog(@"[UCS] 通知授权失败 err=%@", e ? e.localizedDescription : @"nil");
         }
     }];
 }
