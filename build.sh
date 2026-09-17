@@ -13,7 +13,7 @@ set -eu
 #   4) Entitlements must include roothide 4 basic permissions + healthkit private permission
 
 # Version: v3.0.3 (鍚堟垚鏍锋湰鏀归摵鍑屾櫒鏃舵锛岄伩寮€HealthKit鏃堕棿閲嶅彔鍘婚噸瀵艰嚧鐨勬鏁颁涪澶?
-VER=4.3.1
+VER=4.3.2
 echo "Version: $VER"
 PKG="com.sykes.ucs"
 OUT="${PKG}_${VER}_iphoneos-arm64e.deb"
@@ -165,6 +165,7 @@ SCRIPT=/var/mobile/Documents/hb_schedule.sh
 cat > "$SCRIPT" << 'SCRIPT_EOF'
 #!/bin/sh
 LOG=/var/mobile/Documents/hb_launchd.log
+echo "script started $(date) uid=$(id -u)" >> $LOG
 LAST=/var/mobile/Media/HealthBoost/hb_lastgen.txt
 NEXT=/var/mobile/Media/HealthBoost/hb_nexttime.txt
 while true; do
