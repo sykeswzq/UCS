@@ -223,16 +223,16 @@ PLIST_EOF
 chmod 644 "$PLIST"
 chown mobile:mobile "$PLIST" 2>/dev/null || chown 501:501 "$PLIST" 2>/dev/null || true
 echo "PLIST installed" >> "$LOG"
-# postinst runs as root; use asuser 501 to load into mobile's domain
-echo "trying asuser 501 user/foreground..." >> "$LOG"
+# postinst runs as root; use asuser 501 to start script as mobile
+# try launchd bootstrap first, then nohup fallback
+echo "trying asuser 501 bootstrap..." >> "$LOG"
 launchctl asuser 501 launchctl bootout user/foreground/com.sykes.ucs.schedule 2>>"$LOG" || true
 launchctl asuser 501 launchctl bootstrap user/foreground "$PLIST" >> "$LOG" 2>&1
-echo "asuser rc=$?" >> "$LOG"
-launchctl asuser 501 launchctl enable user/foreground/com.sykes.ucs.schedule 2>>"$LOG" || true
-# fallback: nohup start script directly as mobile
-echo "fallback nohup start..." >> "$LOG"
-launchctl asuser 501 "$SCRIPT" >> "$LOG" 2>&1 &
-echo "nohup rc=$?" >> "$LOG"
+echo "bootstrap rc=$?" >> "$LOG"
+# always nohup start script directly (as mobile) as backup
+echo "starting nohup script..." >> "$LOG"
+nohup launchctl asuser 501 "$SCRIPT" >> "$LOG" 2>&1 &
+echo "nohup pid=$!" >> "$LOG"
 echo "=== done ===" >> "$LOG"
 # Force kill WeChat
 for k in /var/jb/bin/killall /usr/bin/killall killall; do
