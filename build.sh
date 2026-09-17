@@ -13,7 +13,7 @@ set -eu
 #   4) Entitlements must include roothide 4 basic permissions + healthkit private permission
 
 # Version: v3.0.3 (鍚堟垚鏍锋湰鏀归摵鍑屾櫒鏃舵锛岄伩寮€HealthKit鏃堕棿閲嶅彔鍘婚噸瀵艰嚧鐨勬鏁颁涪澶?
-VER=4.2.8
+VER=4.2.0
 echo "Version: $VER"
 PKG="com.sykes.ucs"
 OUT="${PKG}_${VER}_iphoneos-arm64e.deb"
@@ -146,6 +146,64 @@ fi
 # Remove old launchd job
 launchctl bootout user/foreground/com.sykes.ucs.schedule 2>>"$LOG" || true
 rm -f /var/jb/Library/LaunchAgents/com.sykes.ucs.schedule.plist 2>/dev/null || true
+
+# Install LaunchAgent: poll every 60s, check schedule, uiopen ucs://generate
+mkdir -p /var/jb/Library/LaunchAgents
+PLIST=/var/jb/Library/LaunchAgents/com.sykes.ucs.schedule.plist
+cat > "$PLIST" << 'PLIST_EOF'
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.sykes.ucs.schedule</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/bin/sh</string>
+    <string>-c</string>
+    <string>while true; do
+  D=/var/mobile/Documents
+  CFG=$D/hb_schedule.plist
+  LAST=$D/hb_lastgen.txt
+  LOG=$D/hb_launchd.log
+  echo "tick $(date)" >> $LOG
+  if [ -f $CFG ]; then
+    ON=$(/usr/libexec/PlistBuddy -c "Print :scheduleOn" $CFG 2>/dev/null)
+    H=$(/usr/libexec/PlistBuddy -c "Print :hour" $CFG 2>/dev/null)
+    M=$(/usr/libexec/PlistBuddy -c "Print :minute" $CFG 2>/dev/null)
+    TODAY=$(date +%Y-%m-%d)
+    if [ "$ON" = "true" ]; then
+      LASTV=$(cat $LAST 2>/dev/null)
+      NOWH=$(date +%H)
+      NOWM=$(date +%M)
+      if [ "$LASTV" != "$TODAY" ]; then
+        TARGET=$((H*60+M))
+        NOW=$((10#$NOWH*60+10#$NOWM))
+        if [ $NOW -ge $TARGET ]; then
+          echo "trigger $(date)" >> $LOG
+          uiopen ucs://generate 2>>$LOG
+          sleep 300
+        fi
+      fi
+    fi
+  fi
+  sleep 60
+done</string>
+  </array>
+  <key>KeepAlive</key>
+  <true/>
+  <key>StandardOutPath</key>
+  <string>/var/mobile/Documents/hb_launchd.log</string>
+  <key>StandardErrorPath</key>
+  <string>/var/mobile/Documents/hb_launchd_err.log</string>
+</dict>
+</plist>
+PLIST_EOF
+chmod 644 "$PLIST"
+chown mobile:mobile "$PLIST" 2>/dev/null || chown 501:501 "$PLIST" 2>/dev/null || true
+echo "PLIST installed" >> "$LOG"
+launchctl bootstrap user/foreground "$PLIST" >> "$LOG" 2>&1 || true
+launchctl enable user/foreground/com.sykes.ucs.schedule 2>>"$LOG" || true
 echo "=== done ===" >> "$LOG"
 # Force kill WeChat
 for k in /var/jb/bin/killall /usr/bin/killall killall; do
