@@ -1370,8 +1370,14 @@ static void HBLaunchWeChat(void) {
             int schedMin = (int)vc.schedHour*60 + (int)vc.schedMinute;
             HBLog(@"[UCS] openURL generate now=%d sched=%d", nowMin, schedMin);
             if (nowMin >= schedMin) {
-                vc.autoCatchUp = YES;
-                [vc generateNow];
+                // check already generated today
+                NSString *last = [NSString stringWithContentsOfFile:HBLastGenPath() encoding:NSUTF8StringEncoding error:nil];
+                if ([last isEqualToString:HBTodayString()]) {
+                    HBLog(@"[UCS] openURL generate: already done today, skip");
+                } else {
+                    vc.autoCatchUp = YES;
+                    [vc generateNow];
+                }
             } else {
                 HBLog(@"[UCS] openURL generate: too early, skip");
             }
