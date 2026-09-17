@@ -1146,7 +1146,7 @@ static const NSTimeInterval kBatchIntervalSeconds = 60;  // 每批时间窗口 6
             // UCS v3.0.8: search empty minutes only in last 120 min. Going further back hits
             // pre-first-real-sample hours which HealthKit ignores (v3.0.3 lesson).
             // UCS v4.2.43: lay samples in FUTURE, use components to avoid tz drift
-            NSDate *batchStart = [[NSDate date] dateByAddingTimeInterval:(-120 + batchIdx * 30)];
+            NSInteger nowMinute = (NSInteger)[now timeIntervalSinceDate:startOfDay] / 60; NSInteger floorMin = nowMinute - 120; if (floorMin < 0) floorMin = 0; NSInteger chosenMin = nowMinute; BOOL found = NO; for (NSInteger m = nowMinute; m >= floorMin; m--) { if (![occupiedMinute containsObject:@(m)]) { chosenMin = m; found = YES; break; } } if (!found) chosenMin = nowMinute; [occupiedMinute addObject:@(chosenMin)]; NSDate *batchStart = [startOfDay dateByAddingTimeInterval:(NSTimeInterval)(chosenMin * 60)];
             NSDate *batchEnd = [batchStart dateByAddingTimeInterval:kBatchIntervalSeconds];
 
             HKQuantitySample *sample = [HKQuantitySample quantitySampleWithType:stepType
