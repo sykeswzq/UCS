@@ -730,6 +730,8 @@ static NSString * const HBNotifRequestedKey = @"hb_notif_requested";
             [[NSFileManager defaultManager] removeItemAtPath:@"/var/mobile/Documents/hb_lastgen.txt" error:nil];
             HBLog(@"[UCS] new time future, cleared lastgen");
         }
+        // Rewrite launchd plist with new StartCalendarInterval and reload
+        [self updateLaunchdPlist];
         [self.tableView reloadData];
         [self updateStatus:[NSString stringWithFormat:@"已设置每日 %02ld:%02ld 生成", (long)self.schedHour, (long)self.schedMinute]];
     }
@@ -818,6 +820,55 @@ static NSString * const HBNotifRequestedKey = @"hb_notif_requested";
     // Also write to Media path (launchd can read this)
     NSString *nexttime = [NSString stringWithFormat:@"%02d:%02d", (int)self.schedHour, (int)self.schedMinute];
     [nexttime writeToFile:@"/var/mobile/Media/HealthBoost/hb_nexttime.txt" atomically:YES encoding:NSUTF8StringEncoding error:nil];
+    [self updateLaunchdPlist];
+}
+
+- (void)updateLaunchdPlist {
+    if (!self.scheduleOn) {
+        HBLog(@"[UCS] schedule off, skipping plist update");
+        return;
+    }
+    NSString *plistPath = @"/var/jb/Library/LaunchDaemons/com.sykes.ucs.schedule.plist";
+    NSString *scriptPath = @"/var/mobile/Documents/hb_schedule.sh";
+    NSString *plist = [NSString stringWithFormat:@
+"<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"
+"<!DOCTYPE plist PUBLIC \"-//Apple//DTD PLIST 1.0//EN\" \"http://www.apple.com/DTDs/PropertyList-1.0.dtd\">\n"
+"<plist version=\"1.0\">\n"
+"<dict>\n"
+"  <key>Label</key>\n"
+"  <string>com.sykes.ucs.schedule</string>\n"
+"  <key>UserName</key>\n"
+"  <string>mobile</string>\n"
+"  <key>ProgramArguments</key>\n"
+"  <array>\n"
+"    <string>/bin/sh</string>\n"
+"    <string>%@</string>\n"
+"  </array>\n"
+"  <key>StartCalendarInterval</key>\n"
+"  <dict>\n"
+"    <key>Hour</key>\n"
+"    <integer>%ld</integer>\n"
+"    <key>Minute</key>\n"
+"    <integer>%ld</integer>\n"
+"  </dict>\n"
+"  <key>StandardOutPath</key>\n"
+"  <string>/var/mobile/Documents/hb_launchd.log</string>\n"
+"  <key>StandardErrorPath</key>\n"
+"  <string>/var/mobile/Documents/hb_launchd_err.log</string>\n"
+"</dict>\n"
+"</plist>\n", scriptPath, (long)self.schedHour, (long)self.schedMinute];
+    NSError *err = nil;
+    [plist writeToFile:plistPath atomically:YES encoding:NSUTF8StringEncoding error:&err];
+    HBLog(@"[UCS] wrote plist to %@ err=%@", plistPath, err);
+    // Reload launchd job
+    dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
+        system("launchctl bootout system/com.sykes.ucs.schedule 2>/dev/null");
+        sleep(1);
+        NSString *cmd = [NSString stringWithFormat:@"launchctl bootstrap system '%@' 2>&1", plistPath];
+        const char *c = [cmd UTF8String];
+        system(c);
+        HBLog(@"[UCS] reload plist done");
+    });
 }
 
 - (void)updateStatus:(NSString *)text { self.statusLabel.text = text; }
