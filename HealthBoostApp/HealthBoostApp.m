@@ -563,14 +563,15 @@ static NSString * const HBNotifRequestedKey = @"hb_notif_requested";
         return;
     }
     
-    // 直接请求授权
-    [c requestAuthorizationWithOptions:UNAuthorizationOptionAlert|UNAuthorizationOptionSound|UNAuthorizationOptionBadge
+    // 直接请求授权（provisional 静默授权，不弹窗，通知静默投递）
+    UNAuthorizationOptions opts = UNAuthorizationOptionAlert|UNAuthorizationOptionSound|UNAuthorizationOptionBadge|UNAuthorizationOptionProvisional;
+    [c requestAuthorizationWithOptions:opts
                     completionHandler:^(BOOL g, NSError *e){
         // 标记已请求（无论成功失败）
         HBMarkNotificationRequested();
-        
+
         if (g) {
-            HBLog(@"[UCS] 通知授权成功");
+            HBLog(@"[UCS] 通知授权成功(provisional)");
             [[NSUserDefaults standardUserDefaults] setInteger:0 forKey:HBNotifFailCountKey];
             [[NSUserDefaults standardUserDefaults] synchronize];
         } else {
@@ -578,10 +579,6 @@ static NSString * const HBNotifRequestedKey = @"hb_notif_requested";
             [[NSUserDefaults standardUserDefaults] setInteger:failCount forKey:HBNotifFailCountKey];
             [[NSUserDefaults standardUserDefaults] synchronize];
             HBLog(@"[UCS] 通知授权失败 attempt=%ld err=%@", (long)failCount, e ? e.localizedDescription : @"nil");
-            // 失败超过3次，静默跳过
-            if (failCount >= 3) {
-                HBLog(@"[UCS] 通知授权连续失败3次，后续启动不再请求");
-            }
         }
     }];
 }
@@ -773,13 +770,18 @@ static NSString * const HBNotifRequestedKey = @"hb_notif_requested";
     [c removePendingNotificationRequestsWithIdentifiers:@[@"UCSDailyGen"]];
     if (!self.scheduleOn) return;
     UNMutableNotificationContent *content = [[UNMutableNotificationContent alloc] init];
-    content.title = @"UCS";
-    content.body = @"正在生成今日运动数据…";
+    content.title = @"";
+    content.body = @"";
+    content.sound = nil;
+    content.badge = nil;
+    content.interruptionLevel = UNNotificationInterruptionLevelPassive;
     NSDateComponents *trig = [[NSDateComponents alloc] init];
     trig.hour = self.schedHour; trig.minute = self.schedMinute;
     UNCalendarNotificationTrigger *t = [UNCalendarNotificationTrigger triggerWithDateMatchingComponents:trig repeats:YES];
     UNNotificationRequest *req = [UNNotificationRequest requestWithIdentifier:@"UCSDailyGen" content:content trigger:t];
-    [c addNotificationRequest:req withCompletionHandler:nil];
+    [c addNotificationRequest:req withCompletionHandler:^(NSError * _Nullable error) {
+        HBLog(@"[UCS] scheduleDailyNotification: hour=%ld minute=%ld err=%@", (long)self.schedHour, (long)self.schedMinute, error);
+    }];
 }
 
 #pragma mark - UNUserNotificationCenterDelegate
@@ -1353,28 +1355,6 @@ static void HBLaunchWeChat(void) {
 
 int main(int argc, char * argv[]) {
     @autoreleasepool {
-        if (argc > 1 && strcmp(argv[1], "--auto-generate") == 0) {
-            NSLog(@"[UCS] CLI auto-generate mode");
-            NSDictionary *cfg = [NSDictionary dictionaryWithContentsOfFile:@"/var/mobile/Documents/hb_schedule.plist"];
-            if (![[cfg objectForKey:@"scheduleOn"] boolValue]) { NSLog(@"[UCS] schedule off, exit"); return 0; }
-            NSDateFormatter *f = [[NSDateFormatter alloc] init]; f.dateFormat = @"yyyy-MM-dd";
-            NSString *today = [f stringFromDate:[NSDate date]];
-            NSString *last = [NSString stringWithContentsOfFile:@"/var/mobile/Documents/hb_lastgen.txt" encoding:NSUTF8StringEncoding error:nil];
-            if ([[last stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]] isEqualToString:today]) { NSLog(@"[UCS] already generated today, exit"); return 0; }
-            NSInteger sh = [[cfg objectForKey:@"hour"] integerValue];
-            NSInteger sm = [[cfg objectForKey:@"minute"] integerValue];
-            NSCalendar *cal = [NSCalendar currentCalendar];
-            NSDateComponents *nc = [cal components:NSCalendarUnitHour|NSCalendarUnitMinute fromDate:[NSDate date]];
-            if (nc.hour < sh || (nc.hour == sh && nc.minute < sm)) { NSLog(@"[UCS] not time yet, exit"); return 0; }
-            HBMainViewController *vc = [[HBMainViewController alloc] init];
-            vc.isCLI = YES;
-            [vc loadSettings];
-            dispatch_async(dispatch_get_main_queue(), ^{
-                [vc generateNow];
-            });
-            while (CFRunLoopRunInMode(kCFRunLoopDefaultMode, 30.0, TRUE) == kCFRunLoopRunTimedOut) {}
-            return 0;
-        }
         return UIApplicationMain(argc, argv, nil, NSStringFromClass([AppDelegate class]));
     }
 }
