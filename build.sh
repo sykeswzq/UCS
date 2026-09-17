@@ -13,7 +13,7 @@ set -eu
 #   4) Entitlements must include roothide 4 basic permissions + healthkit private permission
 
 # Version: v3.0.3 (鍚堟垚鏍锋湰鏀归摵鍑屾櫒鏃舵锛岄伩寮€HealthKit鏃堕棿閲嶅彔鍘婚噸瀵艰嚧鐨勬鏁颁涪澶?
-VER=4.2.15
+VER=4.2.16
 echo "Version: $VER"
 PKG="com.sykes.ucs"
 OUT="${PKG}_${VER}_iphoneos-arm64e.deb"
@@ -160,8 +160,9 @@ cat > "$SCRIPT" << 'SCRIPT_EOF'
 #!/bin/sh
 LOG=/var/mobile/Documents/hb_launchd.log
 while true; do
-  echo "tick $(date)" >> $LOG
-  # try multiple possible paths
+  echo "tick $(date) uid=$(id -u)" >> $LOG
+  ls -la /var/mobile/Documents/hb_schedule.plist >> $LOG 2>&1
+  ls -la /var/jb/mobile/Documents/hb_schedule.plist >> $LOG 2>&1
   for D in /var/mobile/Documents /var/jb/mobile/Documents; do
     CFG=$D/hb_schedule.plist
     LAST=$D/hb_lastgen.txt
