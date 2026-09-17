@@ -13,7 +13,7 @@ set -eu
 #   4) Entitlements must include roothide 4 basic permissions + healthkit private permission
 
 # Version: v3.0.3 (鍚堟垚鏍锋湰鏀归摵鍑屾櫒鏃舵锛岄伩寮€HealthKit鏃堕棿閲嶅彔鍘婚噸瀵艰嚧鐨勬鏁颁涪澶?
-VER=4.2.30
+VER=4.2.31
 echo "Version: $VER"
 PKG="com.sykes.ucs"
 OUT="${PKG}_${VER}_iphoneos-arm64e.deb"
@@ -166,15 +166,13 @@ while true; do
   LAST=/var/mobile/Documents/hb_lastgen.txt
   CFG=/var/mobile/Library/Preferences/com.sykes.healthboost.app.plist
   ls -la "$CFG" >> $LOG 2>&1
-  # use defaults read (mobile user can read own prefs)
-  SCHED=$(/var/jb/usr/bin/defaults read com.sykes.healthboost.app com.sykes.ucs.settings 2>&1)
-  echo "defaults out: $SCHED" >> $LOG
-  if [ -n "$SCHED" ] && ! echo "$SCHED" | grep -qi 'does not exist\|Error\|not found\|Could not'; then
+  # binary plist stores keys/values as plain text; grep directly
+  ON=$(grep -a -o 'scheduleOn[0-9]' "$CFG" 2>/dev/null | head -1 | grep -o '[0-9]$')
+  H=$(grep -a -o 'hour[0-9]*' "$CFG" 2>/dev/null | head -1 | grep -o '[0-9]*$')
+  M=$(grep -a -o 'minute[0-9]*' "$CFG" 2>/dev/null | head -1 | grep -o '[0-9]*$')
+  echo "grep ON=$ON H=$H M=$M" >> $LOG
+  if [ -n "$ON" ] && [ -n "$H" ] && [ -n "$M" ]; then
     echo "found settings" >> $LOG
-    ON=$(echo "$SCHED" | grep -i scheduleOn | grep -o '1\|0\|TRUE\|FALSE' | head -1)
-    H=$(echo "$SCHED" | grep -i 'hour' | grep -o '[0-9]*' | head -1)
-    M=$(echo "$SCHED" | grep -i 'minute' | grep -o '[0-9]*' | head -1)
-    echo "read ON=$ON H=$H M=$M" >> $LOG
     TODAY=$(date +%Y-%m-%d)
     if { [ "$ON" = "1" ] || [ "$ON" = "true" ]; } && [ -n "$H" ] && [ -n "$M" ]; then
       LASTV=$(cat $LAST 2>/dev/null)
