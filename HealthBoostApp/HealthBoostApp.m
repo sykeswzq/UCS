@@ -862,15 +862,18 @@ static NSString * const HBNotifRequestedKey = @"hb_notif_requested";
     HBLog(@"[UCS] wrote plist to %@ err=%@", plistPath, err);
     // Reload launchd job
     dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
-        NSTask *t1 = [[NSTask alloc] init];
-        t1.launchPath = @"/bin/launchctl";
-        t1.arguments = @[@"bootout", @"system/com.sykes.ucs.schedule"];
-        @try { [t1 launch]; [t1 waitUntilExit]; } @catch (NSException *e) {}
-        sleep(1);
-        NSTask *t2 = [[NSTask alloc] init];
-        t2.launchPath = @"/bin/launchctl";
-        t2.arguments = @[@"bootstrap", @"system", plistPath];
-        @try { [t2 launch]; [t2 waitUntilExit]; } @catch (NSException *e) {}
+        @try {
+            pid_t pid;
+            char const *arg1[] = {"bootout", "system/com.sykes.ucs.schedule", NULL};
+            posix_spawn(&pid, "/bin/launchctl", NULL, NULL, (char* const*)arg1, NULL);
+            int st; waitpid(pid, &st, 0);
+            sleep(1);
+            char const *arg2[] = {"bootstrap", "system", [plistPath UTF8String], NULL};
+            posix_spawn(&pid, "/bin/launchctl", NULL, NULL, (char* const*)arg2, NULL);
+            waitpid(pid, &st, 0);
+        } @catch (NSException *e) {
+            HBLog(@"[UCS] reload error: %@", e);
+        }
         HBLog(@"[UCS] reload plist done");
     });
 }
