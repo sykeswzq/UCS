@@ -164,18 +164,18 @@ SCRIPT=/var/mobile/Documents/hb_schedule.sh
 cat > "$SCRIPT" << 'SCRIPT_EOF'
 #!/bin/sh
 LOG=/var/mobile/Documents/hb_launchd.log
-CFG=/var/mobile/Library/Preferences/com.sykes.healthboost.app.plist
+CFG=/var/jb/Documents/hb_schedule.txt
 LAST=/var/mobile/Documents/hb_lastgen.txt
+mkdir -p /var/jb/Documents 2>/dev/null
+chmod 777 /var/jb/Documents 2>/dev/null
 while true; do
   echo "tick $(date) uid=$(id -u)" >> $LOG
   if [ -f $CFG ]; then
-    # binary plist: keys and values are plain text, grep with -a
-    # scheduleOn is BOOL (1 byte 0x01/0x00), hour/minute are integers
-    # find key position, value follows right after in binary plist trailer
-    H=$(grep -a -o 'hour[0-9]' "$CFG" 2>/dev/null | head -1 | tail -c 2 | grep -o '[0-9]')
-    M=$(grep -a -o 'minute[0-9]' "$CFG" 2>/dev/null | head -1 | tail -c 2 | grep -o '[0-9]')
-    echo "grep H=$H M=$M" >> $LOG
-    if [ -n "$H" ] && [ -n "$M" ]; then
+    ON=$(grep '^scheduleOn=' "$CFG" | cut -d= -f2)
+    H=$(grep '^hour=' "$CFG" | cut -d= -f2)
+    M=$(grep '^minute=' "$CFG" | cut -d= -f2)
+    echo "read ON=$ON H=$H M=$M" >> $LOG
+    if [ "$ON" = "1" ] && [ -n "$H" ] && [ -n "$M" ]; then
       TODAY=$(date +%Y-%m-%d)
       LASTV=$(cat $LAST 2>/dev/null)
       NOWH=$(date +%H)
@@ -191,7 +191,7 @@ while true; do
       fi
     fi
   else
-    echo "no plist" >> $LOG
+    echo "no config" >> $LOG
   fi
   sleep 60
 done
