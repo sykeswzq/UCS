@@ -1352,8 +1352,11 @@ static void HBLaunchWeChat(void) {
 @implementation AppDelegate
 - (BOOL)application:(UIApplication *)application didFinishLaunchingWithOptions:(NSDictionary *)launchOptions {
     self.window = [[UIWindow alloc] initWithFrame:[UIScreen mainScreen].bounds];
-    self.window.rootViewController = [[HBMainViewController alloc] init];
+    HBMainViewController *vc = [[HBMainViewController alloc] init];
+    self.window.rootViewController = vc;
     [self.window makeKeyAndVisible];
+    // 尽早设置通知delegate，防止冷启动时通知到达但delegate未设置
+    [UNUserNotificationCenter currentNotificationCenter].delegate = vc;
     return YES;
 }
 @end
