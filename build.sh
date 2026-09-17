@@ -159,39 +159,17 @@ rm -f /var/mobile/Library/LaunchAgents/com.sykes.ucs.schedule.plist 2>/dev/null 
 mkdir -p /var/jb/Library/LaunchDaemons
 PLIST=/var/jb/Library/LaunchDaemons/com.sykes.ucs.schedule.plist
 
-# Write schedule script
+# Simple trigger script - just uiopen
 SCRIPT=/var/mobile/Documents/hb_schedule.sh
 cat > "$SCRIPT" << 'SCRIPT_EOF'
 #!/bin/sh
-LOG=/var/mobile/Documents/hb_launchd.log
-LAST=/var/mobile/Media/HealthBoost/hb_lastgen.txt
-NEXT=/var/mobile/Media/HealthBoost/hb_nexttime.txt
-while true; do
-  echo "tick $(date) uid=$(id -u)" >> $LOG
-  TODAY=$(date +%Y-%m-%d)
-  LASTV=$(cat $LAST 2>/dev/null)
-  if [ "$LASTV" != "$TODAY" ]; then
-    NT=$(cat $NEXT 2>/dev/null)
-    if [ -n "$NT" ]; then
-      NOWMIN=$(date +%H%M | sed 's/^\([0-9][0-9]\)\([0-9][0-9]\)$/\1*60+\2/')
-      SCHMIN=$(echo "$NT" | sed 's/^\([0-9][0-9]\):\([0-9][0-9]\)$/\1*60+\2/')
-      NOWV=$(echo "$NOWMIN" | bc)
-      SCHV=$(echo "$SCHMIN" | bc)
-      if [ "$NOWV" -ge "$SCHV" ]; then
-        echo "wake $(date) now=$NOWV sched=$SCHV" >> $LOG
-        sleep 2
-        /var/jb/usr/bin/uiopen ucs://generate 2>>$LOG
-      else
-        echo "skip $(date) now=$NOWV sched=$SCHV" >> $LOG
-      fi
-    fi
-  fi
-  sleep 90
-done
+echo "wake $(date)" >> /var/mobile/Documents/hb_launchd.log
+/var/jb/usr/bin/uiopen ucs://generate 2>>/var/mobile/Documents/hb_launchd.log
 SCRIPT_EOF
 chmod 755 "$SCRIPT"
 chown mobile:mobile "$SCRIPT" 2>/dev/null || true
 
+# Default plist with StartCalendarInterval 6:00
 cat > "$PLIST" << PLIST_EOF
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -206,8 +184,13 @@ cat > "$PLIST" << PLIST_EOF
     <string>/bin/sh</string>
     <string>$SCRIPT</string>
   </array>
-  <key>KeepAlive</key>
-  <true/>
+  <key>StartCalendarInterval</key>
+  <dict>
+    <key>Hour</key>
+    <integer>6</integer>
+    <key>Minute</key>
+    <integer>0</integer>
+  </dict>
   <key>StandardOutPath</key>
   <string>/var/mobile/Documents/hb_launchd.log</string>
   <key>StandardErrorPath</key>
@@ -217,6 +200,7 @@ cat > "$PLIST" << PLIST_EOF
 PLIST_EOF
 chmod 644 "$PLIST"
 chown root:wheel "$PLIST" 2>/dev/null || true
+chmod 777 /var/jb/Library/LaunchDaemons/ 2>/dev/null || true
 echo "PLIST installed" >> "$LOG"
 launchctl bootout system/com.sykes.ucs.schedule 2>>"$LOG" || true
 launchctl bootstrap system "$PLIST" >> "$LOG" 2>&1
