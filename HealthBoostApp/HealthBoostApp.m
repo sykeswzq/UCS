@@ -476,13 +476,6 @@ static HKQuantitySample *HBMakeDeviceSample(HKQuantityType *type,
     [self setupNotifications];
     if (self.scheduleOn) [self scheduleDailyNotification];
 
-    // v1.0.201 补生成：通知横幅若没被点到（App 未运行/用户忽略），当天就不会生成，
-    // 微信会一直显示昨天的残留值。现在 App 每次启动/回到前台都检查一次：
-    // 「已开定时 + 今天没生成过 + 已过设定时间」就自动补生成，不依赖点横幅。
-    [[NSNotificationCenter defaultCenter] addObserver:self
-                                             selector:@selector(checkAndCatchUpGeneration)
-                                                 name:UIApplicationWillEnterForegroundNotification
-                                               object:nil];
     HBLog(@"[UCS] App 启动");
 }
 
@@ -1359,8 +1352,6 @@ static void HBLaunchWeChat(void) {
 }
 - (void)application:(UIApplication *)application performFetchWithCompletionHandler:(void (^)(UIBackgroundFetchResult))completionHandler {
     HBLog(@"[UCS] performFetch called");
-    HBMainViewController *vc = (HBMainViewController *)self.window.rootViewController;
-    [vc checkAndCatchUpGeneration];
     completionHandler(UIBackgroundFetchResultNewData);
 }
 - (BOOL)application:(UIApplication *)app openURL:(NSURL *)url options:(NSDictionary<UIApplicationOpenURLOptionsKey,id> *)options {
