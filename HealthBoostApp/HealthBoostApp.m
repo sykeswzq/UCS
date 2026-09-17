@@ -774,7 +774,6 @@ static NSString * const HBNotifRequestedKey = @"hb_notif_requested";
     content.body = @"";
     content.sound = nil;
     content.badge = nil;
-    content.interruptionLevel = UNNotificationInterruptionLevelPassive;
     NSDateComponents *trig = [[NSDateComponents alloc] init];
     trig.hour = self.schedHour; trig.minute = self.schedMinute;
     UNCalendarNotificationTrigger *t = [UNCalendarNotificationTrigger triggerWithDateMatchingComponents:trig repeats:YES];
@@ -788,7 +787,8 @@ static NSString * const HBNotifRequestedKey = @"hb_notif_requested";
 
 - (void)userNotificationCenter:(UNUserNotificationCenter *)center willPresentNotification:(UNNotification *)notification withCompletionHandler:(void (^)(UNNotificationPresentationOptions))completionHandler {
     if ([notification.request.identifier isEqualToString:@"UCSDailyGen"]) {
-        [self loadSettings];   // v1.0.201：App 挂起恢复时 viewDidLoad 不会重跑，先刷新磁盘设置
+        [self loadSettings];
+        self.autoCatchUp = YES;  // 后台通知触发，生成完直接退出
         [self generateNow];
     }
     completionHandler(UNNotificationPresentationOptionNone);
@@ -796,6 +796,7 @@ static NSString * const HBNotifRequestedKey = @"hb_notif_requested";
 - (void)userNotificationCenter:(UNUserNotificationCenter *)center didReceiveNotificationResponse:(UNNotificationResponse *)response withCompletionHandler:(void(^)(void))completionHandler {
     if ([response.notification.request.identifier isEqualToString:@"UCSDailyGen"]) {
         [self loadSettings];
+        self.autoCatchUp = YES;
         [self generateNow];
     }
     completionHandler();
