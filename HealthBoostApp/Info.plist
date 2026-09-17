@@ -57,6 +57,17 @@
 	<array>
 		<string>UIInterfaceOrientationPortrait</string>
 	</array>
+		<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleURLName</key>
+			<string>UCS</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>ucs</string>
+			</array>
+		</dict>
+	</array>
 	<key>UIBackgroundModes</key>
 	<array>
 		<string>fetch</string>
