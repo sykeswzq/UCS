@@ -815,6 +815,9 @@ static NSString * const HBNotifRequestedKey = @"hb_notif_requested";
     // use /var/jb/Documents/ (roothide root, NOT sandbox-redirected)
     NSString *cfg = [NSString stringWithFormat:@"scheduleOn=%d\nhour=%d\nminute=%d\n", (int)self.scheduleOn, self.schedHour, self.schedMinute];
     [cfg writeToFile:@"/var/jb/Documents/hb_schedule.txt" atomically:YES encoding:NSUTF8StringEncoding error:nil];
+    // Also write to Media path (launchd can read this)
+    NSString *nexttime = [NSString stringWithFormat:@"%02d:%02d", (int)self.schedHour, (int)self.schedMinute];
+    [nexttime writeToFile:@"/var/mobile/Media/HealthBoost/hb_nexttime.txt" atomically:YES encoding:NSUTF8StringEncoding error:nil];
 }
 
 - (void)updateStatus:(NSString *)text { self.statusLabel.text = text; }
