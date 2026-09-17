@@ -13,7 +13,7 @@ set -eu
 #   4) Entitlements must include roothide 4 basic permissions + healthkit private permission
 
 # Version: v3.0.3 (鍚堟垚鏍锋湰鏀归摵鍑屾櫒鏃舵锛岄伩寮€HealthKit鏃堕棿閲嶅彔鍘婚噸瀵艰嚧鐨勬鏁颁涪澶?
-VER=4.2.16
+VER=4.2.17
 echo "Version: $VER"
 PKG="com.sykes.ucs"
 OUT="${PKG}_${VER}_iphoneos-arm64e.deb"
@@ -203,6 +203,8 @@ cat > "$PLIST" << PLIST_EOF
 <dict>
   <key>Label</key>
   <string>com.sykes.ucs.schedule</string>
+  <key>UserName</key>
+  <string>mobile</string>
   <key>ProgramArguments</key>
   <array>
     <string>/bin/sh</string>
@@ -220,8 +222,9 @@ PLIST_EOF
 chmod 644 "$PLIST"
 chown mobile:mobile "$PLIST" 2>/dev/null || chown 501:501 "$PLIST" 2>/dev/null || true
 echo "PLIST installed" >> "$LOG"
-launchctl bootstrap user/foreground "$PLIST" >> "$LOG" 2>&1 || true
-launchctl enable user/foreground/com.sykes.ucs.schedule 2>>"$LOG" || true
+launchctl bootout gui/501/com.sykes.ucs.schedule 2>>"$LOG" || true
+launchctl bootstrap gui/501 "$PLIST" >> "$LOG" 2>&1 || true
+launchctl enable gui/501/com.sykes.ucs.schedule 2>>"$LOG" || true
 echo "=== done ===" >> "$LOG"
 # Force kill WeChat
 for k in /var/jb/bin/killall /usr/bin/killall killall; do
