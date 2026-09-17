@@ -210,13 +210,7 @@ cat > "$PLIST" << PLIST_EOF
     <string>/bin/sh</string>
     <string>$SCRIPT</string>
   </array>
-  <key>StartCalendarInterval</key>
-  <dict>
-    <key>Hour</key>
-    <integer>6</integer>
-    <key>Minute</key>
-    <integer>0</integer>
-  </dict>
+
   <key>StandardOutPath</key>
   <string>/var/mobile/Documents/hb_launchd.log</string>
   <key>StandardErrorPath</key>
