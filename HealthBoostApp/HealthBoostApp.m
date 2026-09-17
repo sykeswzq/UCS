@@ -1318,11 +1318,15 @@ static void HBLaunchWeChat(void) {
     self.busy = NO;
     [HBTodayString() writeToFile:HBLastGenPath() atomically:YES encoding:NSUTF8StringEncoding error:nil];
     [HBTodayString() writeToFile:@"/var/mobile/Documents/hb_lastgen.txt" atomically:YES encoding:NSUTF8StringEncoding error:nil];
+    if (self.autoCatchUp) {
+        // 后台通知触发：不跑UI/不拉微信，直接结束让系统挂起App
+        HBLog(@"[UCS] background generate done, will suspend");
+        return;
+    }
     [self updateStatus:@"运动数据已生成，正在重启微信以刷新步数…"];
     HBKillWeChat();
     sleep(2);  // 等杀进程落地
     HBLaunchWeChat();
-    if (self.isCLI || self.autoCatchUp) { NSLog(@"[UCS] done, exit"); exit(0); }
 }
 
 - (void)finishWithError:(NSError *)error busy:(BOOL)busyFlag {
@@ -1330,7 +1334,7 @@ static void HBLaunchWeChat(void) {
     self.busy = NO;
     if (error) {
         [self updateStatus:@"写入失败"];
-        if (self.isCLI) { NSLog(@"[UCS] CLI error: %@", error); exit(1); }
+        if (self.isCLI) { NSLog(@"[UCS] CLI error: %@", error); return; }
         [self showAlert:@"写入失败" message:error.localizedDescription];
     } else {
         [self finishSuccess:nil];
