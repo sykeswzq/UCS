@@ -1435,28 +1435,47 @@ static void HBLaunchWeChat(void) {
 
 - (void)setupLaunchdDaemon {
     @try {
-        // Resolve real jbroot path
-        void *sym = dlsym(RTLD_DEFAULT, "jbroot");
-        NSString *daemonDir;
-        if (sym) {
-            typedef const char* (*fn_t)(const char*);
-            fn_t fn = (fn_t)sym;
-            const char *real = fn("/var/jb/Library/LaunchDaemons");
-            if (real) daemonDir = [NSString stringWithUTF8String:real];
-        }
-        if (!daemonDir) daemonDir = @"/var/jb/Library/LaunchDaemons";
-
-        NSFileManager *fm = [NSFileManager defaultManager];
-        [fm createDirectoryAtPath:daemonDir withIntermediateDirectories:YES attributes:nil error:nil];
-
-        // Read schedule time from existing settings
-        NSUserDefaults *def = [[NSUserDefaults alloc] initWithSuiteName:HBSettingsKey];
-        NSInteger hour = [def integerForKey:@"schedHour"];
-        NSInteger minute = [def integerForKey:@"schedMinute"];
-        BOOL on = [def boolForKey:@"scheduleOn"];
-
-        NSString *scriptPath = @"/var/mobile/Documents/hb_schedule.sh";
-        NSString *plistPath = [daemonDir stringByAppendingPathComponent:@"com.sykes.ucs.schedule.plist"];
+        // Use root shell here-doc to write plist to real jbroot path (not FileManager)
+        NSString *scriptPath = @"/var/mobile/Media/HealthBoost/hb_schedule.sh";
+        NSString *shell = [NSString stringWithFormat:@
+        "cat > /var/jb/Library/LaunchDaemons/com.sykes.ucs.schedule.plist <<'EOF'\n"
+        "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"
+        "<!DOCTYPE plist PUBLIC \"-//Apple//DTD PLIST 1.0//EN\" \"http://www.apple.com/DTDs/PropertyList-1.0.dtd\">\n"
+        "<plist version=\"1.0\">\n"
+        "<dict>\n"
+        "  <key>Label</key>\n"
+        "  <string>com.sykes.ucs.schedule</string>\n"
+        "  <key>UserName</key>\n"
+        "  <string>mobile</string>\n"
+        "  <key>ProgramArguments</key>\n"
+        "  <array>\n"
+        "    <string>/bin/sh</string>\n"
+        "    <string>%@</string>\n"
+        "  </array>\n"
+        "  <key>KeepAlive</key>\n"
+        "  <true/>\n"
+        "  <key>StandardOutPath</key>\n"
+        "  <string>/var/mobile/Media/HealthBoost/hb_launchd.log</string>\n"
+        "  <key>StandardErrorPath</key>\n"
+        "  <string>/var/mobile/Media/HealthBoost/hb_launchd_err.log</string>\n"
+        "</dict>\n"
+        "</plist>\n"
+        "EOF\n"
+        "chown root:wheel /var/jb/Library/LaunchDaemons/com.sykes.ucs.schedule.plist\n"
+        "chmod 644 /var/jb/Library/LaunchDaemons/com.sykes.ucs.schedule.plist\n"
+        "launchctl bootout system/com.sykes.ucs.schedule 2>/dev/null\n"
+        "launchctl bootstrap system /var/jb/Library/LaunchDaemons/com.sykes.ucs.schedule.plist\n", scriptPath];
+        dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
+            pid_t pid; int st;
+            char const *args[] = {"/bin/sh", "-c", [shell UTF8String], NULL};
+            posix_spawn(&pid, "/bin/sh", NULL, NULL, (char* const*)args, NULL);
+            waitpid(pid, &st, 0);
+            HBLog(@"[UCS] setupDaemon: shell done");
+        });
+    } @catch (NSException *e) {
+        HBLog(@"[UCS] setupDaemon error: %@", e);
+    }
+}
 
         NSString *plist = [NSString stringWithFormat:@
 "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"
