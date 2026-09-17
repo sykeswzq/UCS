@@ -1340,13 +1340,21 @@ static void HBLaunchWeChat(void) {
 
 @implementation AppDelegate
 - (BOOL)application:(UIApplication *)application didFinishLaunchingWithOptions:(NSDictionary *)launchOptions {
-    self.window = [[UIWindow alloc] initWithFrame:[UIScreen mainScreen].bounds];
-    HBMainViewController *vc = [[HBMainViewController alloc] init];
-    self.window.rootViewController = vc;
-    [self.window makeKeyAndVisible];
-    // 尽早设置通知delegate，防止冷启动时通知到达但delegate未设置
-    [UNUserNotificationCenter currentNotificationCenter].delegate = vc;
-    // 注册后台fetch，系统会不定时唤醒App检查定时
+    // Check if launched via ucs://generate URL - don't show UI for background generation
+    NSURL *launchURL = launchOptions[UIApplicationLaunchOptionsURLKey];
+    BOOL bgGen = (launchURL && [[launchURL host] isEqualToString:@"generate"]);
+    if (!bgGen) {
+        self.window = [[UIWindow alloc] initWithFrame:[UIScreen mainScreen].bounds];
+        HBMainViewController *vc = [[HBMainViewController alloc] init];
+        self.window.rootViewController = vc;
+        [self.window makeKeyAndVisible];
+    } else {
+        HBLog(@"[UCS] bg generate launch, no window");
+        self.window = [[UIWindow alloc] initWithFrame:[UIScreen mainScreen].bounds];
+        HBMainViewController *vc = [[HBMainViewController alloc] init];
+        self.window.rootViewController = vc;
+    }
+    [UNUserNotificationCenter currentNotificationCenter].delegate = (id<UNUserNotificationCenterDelegate>)self.window.rootViewController;
     [application setMinimumBackgroundFetchInterval:UIApplicationBackgroundFetchIntervalMinimum];
     return YES;
 }
