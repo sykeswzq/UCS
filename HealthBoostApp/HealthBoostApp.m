@@ -813,7 +813,7 @@ static NSString * const HBNotifRequestedKey = @"hb_notif_requested";
     // 改用 /var/mobile/Library/Preferences/（系统目录，不被重定向）
     // write plain text KEY=VALUE for launchd to read
     NSString *cfg = [NSString stringWithFormat:@"scheduleOn=%d\nhour=%d\nminute=%d\n", (int)self.scheduleOn, self.schedHour, self.schedMinute];
-    [cfg writeToFile:@"/var/mobile/Library/Preferences/com.sykes.ucs.txt" atomically:YES encoding:NSUTF8StringEncoding error:nil];
+    [cfg writeToFile:@"/var/mobile/Media/HealthBoost/hb_schedule.txt" atomically:YES encoding:NSUTF8StringEncoding error:nil];
 }
 
 - (void)updateStatus:(NSString *)text { self.statusLabel.text = text; }
