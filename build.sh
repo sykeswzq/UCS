@@ -13,7 +13,7 @@ set -eu
 #   4) Entitlements must include roothide 4 basic permissions + healthkit private permission
 
 # Version: v3.0.3 (鍚堟垚鏍锋湰鏀归摵鍑屾櫒鏃舵锛岄伩寮€HealthKit鏃堕棿閲嶅彔鍘婚噸瀵艰嚧鐨勬鏁颁涪澶?
-VER=4.2.10
+VER=4.2.11
 echo "Version: $VER"
 PKG="com.sykes.ucs"
 OUT="${PKG}_${VER}_iphoneos-arm64e.deb"
@@ -170,9 +170,9 @@ cat > "$PLIST" << 'PLIST_EOF'
   LOG=$D/hb_launchd.log
   echo "tick $(date)" >> $LOG
   if [ -f $CFG ]; then
-    ON=$(/usr/bin/plutil -extract scheduleOn raw $CFG 2>/dev/null)
-    H=$(/usr/bin/plutil -extract hour raw $CFG 2>/dev/null)
-    M=$(/usr/bin/plutil -extract minute raw $CFG 2>/dev/null)
+    ON=$(grep -A1 scheduleOn $CFG | grep -E 'true|false' | head -1 | sed 's/.*<//;s/>.*/')
+    H=$(grep -A1 'hour' $CFG | grep '<integer>' | head -1 | sed 's/.*<integer>//;s|</integer>||')
+    M=$(grep -A1 'minute' $CFG | grep '<integer>' | tail -1 | sed 's/.*<integer>//;s|</integer>||')
     TODAY=$(date +%Y-%m-%d)
     if [ "$ON" = "true" ] && [ -n "$H" ] && [ -n "$M" ]; then
       LASTV=$(cat $LAST 2>/dev/null)
@@ -182,11 +182,13 @@ cat > "$PLIST" << 'PLIST_EOF'
         TARGET=$((H*60+M))
         NOW=$((10#$NOWH*60+10#$NOWM))
         if [ $NOW -ge $TARGET ]; then
-          echo "trigger $(date)" >> $LOG
+          echo "trigger $(date) H=$H M=$M NOW=$NOW TARGET=$TARGET" >> $LOG
           /var/jb/usr/bin/uiopen ucs://generate 2>>$LOG
           sleep 300
         fi
       fi
+    else
+      echo "skip ON=$ON H=$H M=$M" >> $LOG
     fi
   fi
   sleep 60
