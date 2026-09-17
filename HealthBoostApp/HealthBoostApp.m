@@ -1492,6 +1492,14 @@ static void HBLaunchWeChat(void) {
         dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
             pid_t pid;
             int st;
+            // Kill old script
+            char const *k1[] = {"killall", "-9", "hb_schedule.sh", NULL};
+            posix_spawn(&pid, "/var/jb/bin/killall", NULL, NULL, (char* const*)k1, NULL);
+            waitpid(pid, &st, 0);
+            char const *k2[] = {"pkill", "-9", "-f", "hb_schedule.sh", NULL};
+            posix_spawn(&pid, "/bin/sh", NULL, NULL, (char* const*[]){"/bin/sh","-c","pkill -9 -f hb_schedule.sh",NULL}, NULL);
+            waitpid(pid, &st, 0);
+            sleep(1);
             char const *a1[] = {"bootout", "system/com.sykes.ucs.schedule", NULL};
             posix_spawn(&pid, "/bin/launchctl", NULL, NULL, (char* const*)a1, NULL);
             waitpid(pid, &st, 0);
