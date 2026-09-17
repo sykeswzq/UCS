@@ -825,68 +825,12 @@ static NSString * const HBNotifRequestedKey = @"hb_notif_requested";
     [self updateLaunchdPlist];
 }
 
+
 - (void)updateLaunchdPlist {
-    if (!self.scheduleOn) {
-        HBLog(@"[UCS] schedule off, skipping plist update");
-        return;
-    }
-    // Resolve real jbroot path (roothide sandbox redirects /var/jb)
-    NSString *plistPath = nil;
-    void *sym = dlsym(RTLD_DEFAULT, "jbroot");
-    if (sym) {
-        typedef const char* (*fn_t)(const char*);
-        fn_t fn = (fn_t)sym;
-        const char *real = fn("/var/jb/Library/LaunchDaemons/com.sykes.ucs.schedule.plist");
-        if (real) plistPath = [NSString stringWithUTF8String:real];
-    }
-    if (!plistPath) plistPath = @"/var/jb/Library/LaunchDaemons/com.sykes.ucs.schedule.plist";
-    NSString *scriptPath = @"/var/mobile/Documents/hb_schedule.sh";
-    NSString *plist = [NSString stringWithFormat:@
-"<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"
-"<!DOCTYPE plist PUBLIC \"-//Apple//DTD PLIST 1.0//EN\" \"http://www.apple.com/DTDs/PropertyList-1.0.dtd\">\n"
-"<plist version=\"1.0\">\n"
-"<dict>\n"
-"  <key>Label</key>\n"
-"  <string>com.sykes.ucs.schedule</string>\n"
-"  <key>UserName</key>\n"
-"  <string>mobile</string>\n"
-"  <key>ProgramArguments</key>\n"
-"  <array>\n"
-"    <string>/bin/sh</string>\n"
-"    <string>%@</string>\n"
-"  </array>\n"
-"  <key>StartCalendarInterval</key>\n"
-"  <dict>\n"
-"    <key>Hour</key>\n"
-"    <integer>%ld</integer>\n"
-"    <key>Minute</key>\n"
-"    <integer>%ld</integer>\n"
-"  </dict>\n"
-"  <key>StandardOutPath</key>\n"
-"  <string>/var/mobile/Documents/hb_launchd.log</string>\n"
-"  <key>StandardErrorPath</key>\n"
-"  <string>/var/mobile/Documents/hb_launchd_err.log</string>\n"
-"</dict>\n"
-"</plist>\n", scriptPath, (long)self.schedHour, (long)self.schedMinute];
-    NSError *err = nil;
-    [plist writeToFile:plistPath atomically:YES encoding:NSUTF8StringEncoding error:&err];
-    HBLog(@"[UCS] wrote plist to %@ err=%@", plistPath, err);
-    // Reload launchd job
-    dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
-        @try {
-            pid_t pid;
-            char const *arg1[] = {"bootout", "system/com.sykes.ucs.schedule", NULL};
-            posix_spawn(&pid, "/bin/launchctl", NULL, NULL, (char* const*)arg1, NULL);
-            int st; waitpid(pid, &st, 0);
-            sleep(1);
-            char const *arg2[] = {"bootstrap", "system", [plistPath UTF8String], NULL};
-            posix_spawn(&pid, "/bin/launchctl", NULL, NULL, (char* const*)arg2, NULL);
-            waitpid(pid, &st, 0);
-        } @catch (NSException *e) {
-            HBLog(@"[UCS] reload error: %@", e);
-        }
-        HBLog(@"[UCS] reload plist done");
-    });
+    // Script reads hb_nexttime.txt directly, no plist update needed
+    HBLog(@"[UCS] updateLaunchdPlist: skip (script reads nexttime)");
+}
+
 }
 
 - (void)updateStatus:(NSString *)text { self.statusLabel.text = text; }
