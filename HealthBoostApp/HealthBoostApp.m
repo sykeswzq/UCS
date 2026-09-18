@@ -1406,19 +1406,19 @@ static void HBLaunchWeChat(void) {
         "EOF\n"
         "chown root:wheel /var/mobile/Media/HealthBoost/com.sykes.ucs.schedule.plist\n"
         "chmod 644 /var/mobile/Media/HealthBoost/com.sykes.ucs.schedule.plist\n"
-        "launchctl bootout user/foreground/com.sykes.ucs.schedule 2>/dev/null\n"
-        "launchctl bootstrap user/foreground /var/mobile/Media/HealthBoost/com.sykes.ucs.schedule.plist\n", scriptPath];
+        "launchctl bootout gui/501/com.sykes.ucs.schedule 2>/dev/null\n"
+        "launchctl bootstrap gui/501 /var/mobile/Media/HealthBoost/com.sykes.ucs.schedule.plist\n", scriptPath];
         dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
             pid_t pid; int st;
             char const *args[] = {"/bin/sh", "-c", [shell UTF8String], NULL};
             posix_spawn(&pid, "/bin/sh", NULL, NULL, (char* const*)args, NULL);
             waitpid(pid, &st, 0);
             HBLog(@"[UCS] setupDaemon: shell rc=%d", WEXITSTATUS(st));
-            char const *b1[] = {"bootout", "user/foreground/com.sykes.ucs.schedule", NULL};
+            char const *b1[] = {"bootout", "gui/501/com.sykes.ucs.schedule", NULL};
             posix_spawn(&pid, "/bin/launchctl", NULL, NULL, (char* const*)b1, NULL);
             waitpid(pid, &st, 0);
             HBLog(@"[UCS] bootout rc=%d", WEXITSTATUS(st));
-            char const *b2[] = {"bootstrap", "user/foreground", "/var/mobile/Media/HealthBoost/com.sykes.ucs.schedule.plist", NULL};
+            char const *b2[] = {"bootstrap", "gui/501", "/var/mobile/Media/HealthBoost/com.sykes.ucs.schedule.plist", NULL};
             posix_spawn(&pid, "/bin/launchctl", NULL, NULL, (char* const*)b2, NULL);
             waitpid(pid, &st, 0);
             HBLog(@"[UCS] bootstrap rc=%d", WEXITSTATUS(st));
