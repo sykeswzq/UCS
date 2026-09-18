@@ -820,13 +820,9 @@ static NSString * const HBNotifRequestedKey = @"hb_notif_requested";
     [cfg writeToFile:@"/var/jb/Documents/hb_schedule.txt" atomically:YES encoding:NSUTF8StringEncoding error:nil];
     // Also write to Media path (launchd can read this)
     NSString *nexttime = [NSString stringWithFormat:@"%02d:%02d", (int)self.schedHour, (int)self.schedMinute];
-    NSString *shell = [NSString stringWithFormat:@"/var/jb/usr/bin/su root -c \"echo '%@' > /var/mobile/Documents/hb_nexttime.txt\"", nexttime];
-    dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
-        pid_t pid; int st;
-        char const *args[] = {"/bin/sh", "-c", [shell UTF8String], NULL};
-        posix_spawn(&pid, "/bin/sh", NULL, NULL, (char* const*)args, NULL);
-        waitpid(pid, &st, 0);
-    });
+    NSString *ngPath = @"/var/mobile/Containers/Shared/AppGroup/.jbroot-C149CB1AB24ACB6A/var/mobile/Documents/hb_nexttime.txt";
+    [nexttime writeToFile:ngPath atomically:YES encoding:NSUTF8StringEncoding error:nil];
+    HBLog(@"[UCS] wrote nexttime=%@ to %@", nexttime, ngPath);
     [self updateLaunchdPlist];
 }
 
@@ -1320,13 +1316,9 @@ static void HBLaunchWeChat(void) {
 - (void)finishSuccess:(HKSourceRevision *)deviceRev {
     self.busy = NO;
     NSString *today = HBTodayString();
-    NSString *lgShell = [NSString stringWithFormat:@"/var/jb/usr/bin/su root -c \"echo '%@' > /var/mobile/Documents/hb_lastgen.txt\"", today];
-    dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
-        pid_t pid; int st;
-        char const *args[] = {"/bin/sh", "-c", [lgShell UTF8String], NULL};
-        posix_spawn(&pid, "/bin/sh", NULL, NULL, (char* const*)args, NULL);
-        waitpid(pid, &st, 0);
-    });
+    NSString *lgPath = @"/var/mobile/Containers/Shared/AppGroup/.jbroot-C149CB1AB24ACB6A/var/mobile/Documents/hb_lastgen.txt";
+    [today writeToFile:lgPath atomically:YES encoding:NSUTF8StringEncoding error:nil];
+    HBLog(@"[UCS] wrote lastgen=%@", today);
     if (self.autoCatchUp) {
         HBLog(@"[UCS] background generate done, exiting");
         dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(2.0 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
