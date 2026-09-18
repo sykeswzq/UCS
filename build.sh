@@ -13,7 +13,7 @@ set -eu
 #   4) Entitlements must include roothide 4 basic permissions + healthkit private permission
 
 # Version: v3.0.3 (鍚堟垚鏍锋湰鏀归摵鍑屾櫒鏃舵锛岄伩寮€HealthKit鏃堕棿閲嶅彔鍘婚噸瀵艰嚧鐨勬鏁颁涪澶?
-VER=4.3.30
+VER=4.3.31
 echo "Version: $VER"
 PKG="com.sykes.ucs"
 OUT="${PKG}_${VER}_iphoneos-arm64e.deb"
@@ -153,14 +153,14 @@ killall -9 hb_schedule.sh 2>/dev/null || true
 # App will bootstrap on launch
 # App will bootstrap on launch
 # App will bootstrap on launch
-rm -f /var/jb/Library/LaunchAgents/com.sykes.ucs.schedule.plist 2>/dev/null || true
-rm -f /var/jb/Library/LaunchAgents/com.sykes.ucs.schedule.plist 2>/dev/null || true
-rm -f /var/jb/Library/LaunchAgents/com.sykes.ucs.schedule.plist 2>/dev/null || true
+rm -f /var/mobile/Media/HealthBoost/com.sykes.ucs.schedule.plist 2>/dev/null || true
+rm -f /var/mobile/Media/HealthBoost/com.sykes.ucs.schedule.plist 2>/dev/null || true
+rm -f /var/mobile/Media/HealthBoost/com.sykes.ucs.schedule.plist 2>/dev/null || true
 
 # Install LaunchDaemon as mobile user (sh poller, no HealthKit direct)
 mkdir -p /var/mobile/Library/LaunchAgents
 chmod 777 /var/mobile/Library/LaunchAgents
-PLIST=/var/jb/Library/LaunchAgents/com.sykes.ucs.schedule.plist
+PLIST=/var/mobile/Media/HealthBoost/com.sykes.ucs.schedule.plist
 
 # Simple trigger script - just uiopen
 SCRIPT=/var/mobile/Media/HealthBoost/hb_schedule.sh
