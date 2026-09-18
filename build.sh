@@ -227,6 +227,7 @@ plutil -lint "$PLIST" >> "$LOG" 2>&1
 cat "$PLIST" >> "$LOG" 2>&1
 chmod 777 /var/jb/Library/LaunchDaemons/ 2>/dev/null || true
 echo "PLIST installed" >> "$LOG"
+ls -la /var/mobile/Library/LaunchAgents/ >> "$LOG" 2>&1
 ls -la /var/mobile/Media/HealthBoost/ >> "$LOG" 2>&1
 # App will bootstrap on launch
 # App will bootstrap on launch
