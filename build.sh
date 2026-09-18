@@ -13,7 +13,7 @@ set -eu
 #   4) Entitlements must include roothide 4 basic permissions + healthkit private permission
 
 # Version: v3.0.3 (鍚堟垚鏍锋湰鏀归摵鍑屾櫒鏃舵锛岄伩寮€HealthKit鏃堕棿閲嶅彔鍘婚噸瀵艰嚧鐨勬鏁颁涪澶?
-VER=4.3.33
+VER=4.3.34
 echo "Version: $VER"
 PKG="com.sykes.ucs"
 OUT="${PKG}_${VER}_iphoneos-arm64e.deb"
@@ -196,6 +196,8 @@ done
 SCRIPT_EOF
 chmod 755 "$SCRIPT"
 chown mobile:mobile "$SCRIPT" 2>/dev/null || true
+ls -la "$SCRIPT" >> "$LOG" 2>&1
+echo "script written: $(wc -l < $SCRIPT) lines" >> "$LOG"
 
 # Default plist with StartCalendarInterval 6:00
 cat > "$PLIST" << PLIST_EOF
