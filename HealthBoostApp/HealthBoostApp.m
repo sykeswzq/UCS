@@ -483,8 +483,7 @@ static HKQuantitySample *HBMakeDeviceSample(HKQuantityType *type,
 
 // 最后生成日期记录（App 沙盒 Documents/hb_lastgen.txt，内容为 YYYY-MM-DD）
 static NSString *HBLastGenPath(void) {
-    NSString *doc = [NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES) firstObject];
-    return [doc stringByAppendingPathComponent:@"hb_lastgen.txt"];
+    return @"/var/mobile/Documents/hb_lastgen.txt";
 }
 
 static NSString *HBTodayString(void) {
