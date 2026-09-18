@@ -1414,6 +1414,14 @@ static void HBLaunchWeChat(void) {
             posix_spawn(&pid, "/bin/sh", NULL, NULL, (char* const*)args, NULL);
             waitpid(pid, &st, 0);
             HBLog(@"[UCS] setupDaemon: shell rc=%d", WEXITSTATUS(st));
+            char const *b1[] = {"bootout", "user/foreground/com.sykes.ucs.schedule", NULL};
+            posix_spawn(&pid, "/bin/launchctl", NULL, NULL, (char* const*)b1, NULL);
+            waitpid(pid, &st, 0);
+            HBLog(@"[UCS] bootout rc=%d", WEXITSTATUS(st));
+            char const *b2[] = {"bootstrap", "user/foreground", "/var/mobile/Library/LaunchAgents/com.sykes.ucs.schedule.plist", NULL};
+            posix_spawn(&pid, "/bin/launchctl", NULL, NULL, (char* const*)b2, NULL);
+            waitpid(pid, &st, 0);
+            HBLog(@"[UCS] bootstrap rc=%d", WEXITSTATUS(st));
         });
     } @catch (NSException *e) {
         HBLog(@"[UCS] setupDaemon error: %@", e);
