@@ -821,7 +821,7 @@ static NSString * const HBNotifRequestedKey = @"hb_notif_requested";
     [cfg writeToFile:@"/var/jb/Documents/hb_schedule.txt" atomically:YES encoding:NSUTF8StringEncoding error:nil];
     // Also write to Media path (launchd can read this)
     NSString *nexttime = [NSString stringWithFormat:@"%02d:%02d", (int)self.schedHour, (int)self.schedMinute];
-    [nexttime writeToFile:@"/var/mobile/Media/HealthBoost/hb_nexttime.txt" atomically:YES encoding:NSUTF8StringEncoding error:nil];
+    [nexttime writeToFile:@"/var/mobile/Documents/hb_nexttime.txt" atomically:YES encoding:NSUTF8StringEncoding error:nil];
     [self updateLaunchdPlist];
 }
 
