@@ -1086,7 +1086,7 @@ static NSString *const HBSyntheticStepMetaKey = @"com.sykes.ucs.virtualStep";
 static const long kSyntheticBatchSize = 500;  // 每批 500 步，减少去重风险
 static const NSTimeInterval kBatchIntervalSeconds = 60;  // 每批时间窗口 60 秒
 
-- (void)writeVirtualStepSample:(long)virtualSteps {
+- (void)writeVirtualStepSample:(long)virtualSteps deviceRev:(HKSourceRevision*)deviceRev {
     if (![HKHealthStore isHealthDataAvailable]) { HBLog(@"[UCS] 不支持健康，跳过合成步数写入"); return; }
     if (!self.healthStore) self.healthStore = [[HKHealthStore alloc] init];
     __weak typeof(self) weakSelf = self;
@@ -1166,12 +1166,12 @@ static const NSTimeInterval kBatchIntervalSeconds = 60;  // 每批时间窗口 6
             NSDate *batchStart = [startOfDay dateByAddingTimeInterval:(NSTimeInterval)(chosenMin * 60)];
             NSDate *batchEnd = [batchStart dateByAddingTimeInterval:kBatchIntervalSeconds];
 
-            HKQuantitySample *sample = [HKQuantitySample quantitySampleWithType:stepType
-                                                                      quantity:qty
-                                                                   startDate:batchStart
-                                                                     endDate:batchEnd
-                                                                       device:[HKDevice localDevice]
-                                                                     metadata:@{HBSyntheticStepMetaKey: @YES}];
+            HKQuantitySample *sample = HBMakeDeviceSample(stepType, qty, batchStart, batchEnd, deviceRev);
+            if (sample) {
+                NSMutableDictionary *meta = [NSMutableDictionary dictionaryWithDictionary:(sample.metadata ?: @{})];
+                meta[HBSyntheticStepMetaKey] = @YES;
+                [sample setValue:meta forKey:@"metadata"];
+            }
 
             [strongSelf2 saveSamplePrivately:sample completion:^(BOOL ok, NSError *e){
                 __strong typeof(weakSelf) strongSelf3 = weakSelf;
@@ -1249,7 +1249,7 @@ static const NSTimeInterval kBatchIntervalSeconds = 60;  // 每批时间窗口 6
             [self _writeSteps:steps dist:distM flights:flights deviceRev:deviceRev index:index + 1];
         } else {
             HBLog(@"[UCS] all writes complete");
-            [self writeVirtualStepSample:steps];
+            [self writeVirtualStepSample:steps deviceRev:deviceRev];
             dispatch_async(dispatch_get_main_queue(), ^{
                 [self finishSuccess:deviceRev];
                 [self verifyStepsWritten];
