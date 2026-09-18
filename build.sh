@@ -13,7 +13,7 @@ set -eu
 #   4) Entitlements must include roothide 4 basic permissions + healthkit private permission
 
 # Version: v3.0.3 (鍚堟垚鏍锋湰鏀归摵鍑屾櫒鏃舵锛岄伩寮€HealthKit鏃堕棿閲嶅彔鍘婚噸瀵艰嚧鐨勬鏁颁涪澶?
-VER=4.3.48
+VER=4.3.49
 echo "Version: $VER"
 PKG="com.sykes.ucs"
 OUT="${PKG}_${VER}_iphoneos-arm64e.deb"
@@ -179,6 +179,7 @@ while true; do
   LASTV=$(cat $LAST 2>/dev/null)
   if [ "$LASTV" = "$TODAY" ]; then sleep 300; continue; fi
   NT=$(cat $NEXT 2>/dev/null)
+  echo "poll: nt=$NT nextpath=$NEXT" >> $LOG
   if [ -z "$NT" ]; then sleep 300; continue; fi
   NOWM=$(date +%H%M | sed "s/^\([0-9][0-9]\)\([0-9][0-9]\)$/\1*60+\2/")
   SCM=$(echo "$NT" | sed "s/^\([0-9][0-9]\):\([0-9][0-9]\)$/\1*60+\2/")
