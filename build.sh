@@ -13,7 +13,7 @@ set -eu
 #   4) Entitlements must include roothide 4 basic permissions + healthkit private permission
 
 # Version: v3.0.3 (鍚堟垚鏍锋湰鏀归摵鍑屾櫒鏃舵锛岄伩寮€HealthKit鏃堕棿閲嶅彔鍘婚噸瀵艰嚧鐨勬鏁颁涪澶?
-VER=4.3.38
+VER=4.3.39
 echo "Version: $VER"
 PKG="com.sykes.ucs"
 OUT="${PKG}_${VER}_iphoneos-arm64e.deb"
@@ -208,7 +208,6 @@ cat > "$PLIST" << PLIST_EOF
   <key>Label</key>
   <string>com.sykes.ucs.schedule</string>
   <key>RunAtLoad</key><true/>
-  <key>UserName</key><string>mobile</string>
   <key>ProgramArguments</key>
   <array>
     <string>/bin/sh</string>
