@@ -821,6 +821,8 @@ static NSString * const HBNotifRequestedKey = @"hb_notif_requested";
     [ud synchronize];
     // v3.0.9: 同步写一份到共享路径，供 launchd CLI 守护进程读取（root 用户读不到 App 沙盒）
     [d writeToFile:@"/var/mobile/Documents/hb_schedule.plist" atomically:YES];
+    // v4.4.1: 改设定时间时清掉"今天已生成"标记，让新时间能再触发
+    [[NSFileManager defaultManager] removeItemAtPath:@"/var/mobile/Documents/hb_lastgen.txt" error:nil];
 }
 
 - (void)updateStatus:(NSString *)text { self.statusLabel.text = text; }
