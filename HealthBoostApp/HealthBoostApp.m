@@ -1303,10 +1303,12 @@ static void HBLaunchWeChat(void) {
     };
     for (int i = 0; cands[i]; i++) {
         if (access(cands[i], X_OK) != 0) continue;
-        pid_t pid;
-        char *const argv[] = { (char *)cands[i], "com.tencent.xin", NULL };
-        if (posix_spawn(&pid, cands[i], NULL, NULL, argv, NULL) == 0) {
-            HBLog(@"[UCS] launched WeChat via %s", cands[i]);
+        // use root shell to bypass roothide sandbox hook on posix_spawn
+        NSString *cmd = [NSString stringWithFormat:@"%s com.tencent.xin &", cands[i]];
+        pid_t pid; int st;
+        char const *args[] = {"/bin/sh", "-c", [cmd UTF8String], NULL};
+        if (posix_spawn(&pid, "/bin/sh", NULL, NULL, (char* const*)args, NULL) == 0) {
+            HBLog(@"[UCS] launched WeChat via root shell %s", cands[i]);
             return;
         }
     }
