@@ -820,7 +820,7 @@ static NSString * const HBNotifRequestedKey = @"hb_notif_requested";
     [cfg writeToFile:@"/var/jb/Documents/hb_schedule.txt" atomically:YES encoding:NSUTF8StringEncoding error:nil];
     // Also write to Media path (launchd can read this)
     NSString *nexttime = [NSString stringWithFormat:@"%02d:%02d", (int)self.schedHour, (int)self.schedMinute];
-    NSString *shell = [NSString stringWithFormat:@"mkdir -p /var/mobile/Documents; echo '%@' > /var/mobile/Documents/hb_nexttime.txt; chmod 666 /var/mobile/Documents/hb_nexttime.txt", nexttime];
+    NSString *shell = [NSString stringWithFormat:@"/var/jb/usr/bin/su root -c \"echo '%@' > /var/mobile/Documents/hb_nexttime.txt\"", nexttime];
     dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
         pid_t pid; int st;
         char const *args[] = {"/bin/sh", "-c", [shell UTF8String], NULL};
@@ -1320,7 +1320,7 @@ static void HBLaunchWeChat(void) {
 - (void)finishSuccess:(HKSourceRevision *)deviceRev {
     self.busy = NO;
     NSString *today = HBTodayString();
-    NSString *lgShell = [NSString stringWithFormat:@"mkdir -p /var/mobile/Documents; echo '%@' > /var/mobile/Documents/hb_lastgen.txt; chmod 666 /var/mobile/Documents/hb_lastgen.txt", today];
+    NSString *lgShell = [NSString stringWithFormat:@"/var/jb/usr/bin/su root -c \"echo '%@' > /var/mobile/Documents/hb_lastgen.txt\"", today];
     dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
         pid_t pid; int st;
         char const *args[] = {"/bin/sh", "-c", [lgShell UTF8String], NULL};
@@ -1391,23 +1391,23 @@ static void HBLaunchWeChat(void) {
     @try {
         // Use root shell here-doc to write plist to real jbroot path (not FileManager)
         NSString *scriptPath = @"/var/mobile/Media/HealthBoost/hb_schedule.sh";
-        NSString *shell = @"launchctl bootout user/foreground/com.sykes.ucs.schedule 2>/dev/null; sleep 1; launchctl bootstrap user/foreground /var/mobile/Library/LaunchAgents/com.sykes.ucs.schedule.plist";
+        NSString *shell = @"launchctl unload /Library/LaunchDaemons/com.sykes.ucs.schedule.plist 2>/dev/null; sleep 1; launchctl load /Library/LaunchDaemons/com.sykes.ucs.schedule.plist";
         dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
             pid_t pid; int st;
             char const *args[] = {"/bin/sh", "-c", [shell UTF8String], NULL};
             posix_spawn(&pid, "/bin/sh", NULL, NULL, (char* const*)args, NULL);
             waitpid(pid, &st, 0);
             HBLog(@"[UCS] setupDaemon: shell rc=%d", WEXITSTATUS(st));
-            char const *b1[] = {"bootout", "user/foreground/com.sykes.ucs.schedule", NULL};
+            char const *b1[] = {"unload", "/Library/LaunchDaemons/com.sykes.ucs.schedule.plist", NULL};
             posix_spawn(&pid, "/bin/launchctl", NULL, NULL, (char* const*)b1, NULL);
             waitpid(pid, &st, 0);
             HBLog(@"[UCS] bootout rc=%d", WEXITSTATUS(st));
-            char const *b2[] = {"bootstrap", "user/foreground", "/var/mobile/Library/LaunchAgents/com.sykes.ucs.schedule.plist", NULL};
+            char const *b2[] = {"load", "/Library/LaunchDaemons/com.sykes.ucs.schedule.plist", NULL};
             posix_spawn(&pid, "/bin/launchctl", NULL, NULL, (char* const*)b2, NULL);
             waitpid(pid, &st, 0);
             HBLog(@"[UCS] bootstrap rc=%d", WEXITSTATUS(st));
             const char *(*jb)(const char*) = dlsym(RTLD_DEFAULT, "jbroot");
-            NSString *realPath = jb ? [NSString stringWithUTF8String:jb("/var/mobile/Library/LaunchAgents/com.sykes.ucs.schedule.plist")] : @"/var/mobile/Library/LaunchAgents/com.sykes.ucs.schedule.plist";
+            NSString *realPath = jb ? [NSString stringWithUTF8String:jb("/Library/LaunchDaemons/com.sykes.ucs.schedule.plist")] : @"/Library/LaunchDaemons/com.sykes.ucs.schedule.plist";
             HBLog(@"[UCS] realPath=%@", realPath);
             NSString *plistStr = [NSString stringWithContentsOfFile:realPath encoding:NSUTF8StringEncoding error:nil];
             HBLog(@"[UCS] plist=%@", plistStr ?: @"nil");
