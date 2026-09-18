@@ -168,7 +168,7 @@ cat > "$SCRIPT" << 'SCRIPT_EOF'
 #!/bin/sh
 LOG=/var/mobile/Media/HealthBoost/hb_launchd.log
 echo "script started $(date) uid=$(id -u)" >> $LOG
-LAST=/var/mobile/Media/HealthBoost/hb_lastgen.txt
+LAST=/var/mobile/Documents/hb_lastgen.txt
 NEXT=/var/mobile/Documents/hb_nexttime.txt
 while true; do
   TODAY=$(date +%Y-%m-%d)
