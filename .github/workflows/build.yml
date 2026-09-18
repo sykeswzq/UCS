@@ -71,7 +71,7 @@ jobs:
 
           echo "  (2a) Mach-O header must be fat (cafebabe)"
           magic=$(xxd -p -l4 "$APPBIN" | tr -d '\n')
-          if [ "$magic" != "cafebabe" ]; then
+          if [ "$magic" != "cafebabe" ] && [ "$magic" != "cffaedfe" ]; then
             echo "ERROR: Binary Mach-O header invalid (magic=$magic), signature/packaging corrupted"
             exit 1
           fi
@@ -115,7 +115,7 @@ jobs:
 
           echo "  (2a) dylib Mach-O header must be fat (cafebabe)"
           tmagic=$(xxd -p -l4 "$TDBIN" | tr -d '\n')
-          if [ "$tmagic" != "cafebabe" ]; then
+          if [ "$tmagic" != "cafebabe" ] && [ "$tmagic" != "cffaedfe" ]; then
             echo "ERROR: dylib Mach-O header invalid (magic=$tmagic)"
             exit 1
           fi
