@@ -104,7 +104,7 @@ fi
 
 # Verify dylib Mach-O magic
 smagic=$(xxd -p -l4 tweak_staging/Library/MobileSubstrate/DynamicLibraries/StepFaker.dylib 2>/dev/null || od -An -tx1 -N4 tweak_staging/Library/MobileSubstrate/DynamicLibraries/StepFaker.dylib | tr -d ' \n')
-if [ "$smagic" != "cafebabe" ]; then
+if [ "$smagic" != "cafebabe" ] && [ "$smagic" != "cffaedfe" ]; then
   echo "ERROR: tweak dylib Mach-O header invalid (magic=$smagic)"
   exit 1
 fi
