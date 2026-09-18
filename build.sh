@@ -126,7 +126,7 @@ Installed-Size: 1152
 Depends: firmware (>= 13.0)
 Maintainer: sykeswzq
 Author: sykeswzq
-Description: UCS 杩愬姩姝ユ暟娉ㄥ叆宸ュ叿锛屽仴搴蜂笌寰俊杩愬姩鍚屾鏄剧ず鐪熷疄+铏氭嫙姝ユ暟
+Description: UCS 运动步数注入工具，健康与微信运动同步显示真实+虚拟步数
 Section: utilities
 Priority: optional
 EOF
