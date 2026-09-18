@@ -1406,8 +1406,8 @@ static void HBLaunchWeChat(void) {
         "EOF\n"
         "chown root:wheel /var/jb/Library/LaunchDaemons/com.sykes.ucs.schedule.plist\n"
         "chmod 644 /var/jb/Library/LaunchDaemons/com.sykes.ucs.schedule.plist\n"
-        "launchctl bootout system/com.sykes.ucs.schedule 2>/dev/null\n"
-        "launchctl bootstrap system /var/jb/Library/LaunchDaemons/com.sykes.ucs.schedule.plist\n", scriptPath];
+        "launchctl bootout gui/501/com.sykes.ucs.schedule 2>/dev/null\n"
+        "launchctl bootstrap gui/501 /var/jb/Library/LaunchDaemons/com.sykes.ucs.schedule.plist\n", scriptPath];
         dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
             pid_t pid; int st;
             char const *args[] = {"/bin/sh", "-c", [shell UTF8String], NULL};
