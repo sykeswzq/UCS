@@ -1362,7 +1362,7 @@ static void HBLaunchWeChat(void) {
             return;
         }
         // bootout old instance first
-        system("launchctl bootout gui/501/com.sykes.ucs.schedule 2>/dev/null");
+        popen("launchctl bootout gui/501/com.sykes.ucs.schedule 2>/dev/null", "r");
         usleep(300000);
         // bootstrap in gui/501 (mobile user GUI domain, same uid=501 as us)
         NSString *cmd = [NSString stringWithFormat:@"launchctl bootstrap gui/501 '%@' 2>&1", plistPath];
@@ -1374,7 +1374,7 @@ static void HBLaunchWeChat(void) {
             }
             pclose(fp);
         }
-        system("launchctl enable gui/501/com.sykes.ucs.schedule 2>/dev/null");
+        popen("launchctl enable gui/501/com.sykes.ucs.schedule 2>/dev/null", "r");
         HBLog(@"setupDaemon: done bootstrap gui/501");
     });
 
