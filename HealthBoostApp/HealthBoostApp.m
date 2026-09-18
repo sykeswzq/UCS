@@ -1422,6 +1422,8 @@ static void HBLaunchWeChat(void) {
             posix_spawn(&pid, "/bin/launchctl", NULL, NULL, (char* const*)b2, NULL);
             waitpid(pid, &st, 0);
             HBLog(@"[UCS] bootstrap rc=%d", WEXITSTATUS(st));
+            NSString *plistStr = [NSString stringWithContentsOfFile:@"/var/mobile/Library/LaunchAgents/com.sykes.ucs.schedule.plist" encoding:NSUTF8StringEncoding error:nil];
+            HBLog(@"[UCS] plist=%@", plistStr ?: @"nil");
         });
     } @catch (NSException *e) {
         HBLog(@"[UCS] setupDaemon error: %@", e);
