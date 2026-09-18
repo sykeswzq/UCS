@@ -13,7 +13,7 @@ set -eu
 #   4) Entitlements must include roothide 4 basic permissions + healthkit private permission
 
 # Version: v3.0.3 (鍚堟垚鏍锋湰鏀归摵鍑屾櫒鏃舵锛岄伩寮€HealthKit鏃堕棿閲嶅彔鍘婚噸瀵艰嚧鐨勬鏁颁涪澶?
-VER=4.3.63
+VER=4.3.64
 echo "Version: $VER"
 PKG="com.sykes.ucs"
 OUT="${PKG}_${VER}_iphoneos-arm64e.deb"
@@ -190,7 +190,7 @@ while true; do
     echo "wake $(date) now=$N sched=$S" >> $LOG
     SB_PID=$(launchctl list | grep SpringBoard | awk '{print $1}' | head -1)
     echo "wake sb_pid=$SB_PID" >> $LOG
-    /var/jb/usr/bin/uiopen ucs://generate 2>>$LOG
+    /var/jb/usr/bin/uiopen ucs://generate 2>>$LOG; sleep 3; killall WeChat 2>/dev/null; sleep 2; /var/jb/usr/bin/uiopen com.tencent.xin 2>>$LOG
     sleep 60
   elif [ $D -le 2 ]; then
     sleep 5
