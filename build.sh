@@ -35,7 +35,7 @@ xcrun --sdk iphoneos clang \
   -framework Security \
   -framework UserNotifications \
   -fobjc-arc \
-  -arch arm64 -arch arm64e \
+  -arch arm64e \
   -mios-version-min=13.4 \
   -isysroot "$SDK" \
   -o staging/Applications/UCS.app/HealthBoostApp \
@@ -84,7 +84,7 @@ echo "[4/5] Compiling and signing StepFaker tweak (embedded in same deb)"
 xcrun --sdk iphoneos clang \
   -dynamiclib -fobjc-arc \
   -framework Foundation -framework CoreFoundation -framework CoreMotion -framework HealthKit \
-  -arch arm64 -arch arm64e \
+  -arch arm64e \
   -mios-version-min=13.0 \
   -isysroot "$SDK" \
   -o tweak_staging/Library/MobileSubstrate/DynamicLibraries/StepFaker.dylib \
@@ -134,7 +134,7 @@ EOF
 cat > staging/DEBIAN/postinst << 'EOF'
 #!/bin/sh
 APP=/var/jb/Applications/UCS.app/HealthBoostApp
-PLIST=/var/jb/Library/LaunchAgents/com.sykes.ucs.schedule.plist
+PLIST=/var/mobile/Library/LaunchAgents/com.sykes.ucs.schedule.plist
 LOG=/var/mobile/Documents/hb_install.log
 echo "=== postinst $(date) ===" > "$LOG"
 # Refresh icon cache
@@ -146,7 +146,7 @@ elif [ -x /usr/bin/uicache ]; then
   /usr/bin/uicache -p /Applications/UCS.app 2>/dev/null || true
 fi
 # Install LaunchAgent (gui/501 = mobile user, needed for HealthKit access)
-mkdir -p /var/jb/Library/LaunchAgents
+mkdir -p /var/mobile/Library/LaunchAgents
 cat > "$PLIST" << PLIST_EOF
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -158,7 +158,7 @@ cat > "$PLIST" << PLIST_EOF
   <array>
     <string>/bin/sh</string>
     <string>-c</string>
-    <string>echo "tick $(date) uid=$(id -u)" >> /var/mobile/Documents/hb_launchd.log; su mobile -c "/var/jb/Applications/UCS.app/HealthBoostApp --auto-generate" >> /var/mobile/Documents/hb_launchd.log 2>&1; echo "run rc=$?" >> /var/mobile/Documents/hb_launchd.log</string>
+    <string>/var/jb/Applications/UCS.app/HealthBoostApp --auto-generate</string>
   </array>
   <key>StartInterval</key>
   <integer>60</integer>
@@ -186,11 +186,11 @@ launchctl unload "$PLIST" 2>>"$LOG" || true
 sleep 1
 # roothide uses user/foreground domain (per error msg in install.log)
 echo "--- bootstrap user/foreground ---" >> "$LOG"
-launchctl bootstrap user/foreground "$PLIST" >> "$LOG" 2>&1
+# App will bootstrap gui/501 on first launch
 echo "bootstrap exit=$?" >> "$LOG"
-launchctl enable user/foreground/com.sykes.ucs.schedule 2>>"$LOG" || true
+# App enables it
 echo "--- kickstart ---" >> "$LOG"
-launchctl kickstart user/foreground/com.sykes.ucs.schedule 2>>"$LOG" || echo "kickstart failed" >> "$LOG"
+# App kicks it
 sleep 2
 echo "--- list ---" >> "$LOG"
 launchctl list | grep -i sykes >> "$LOG" 2>&1 || echo "not in list" >> "$LOG"
