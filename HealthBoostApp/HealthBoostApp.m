@@ -1319,8 +1319,14 @@ static void HBLaunchWeChat(void) {
 
 - (void)finishSuccess:(HKSourceRevision *)deviceRev {
     self.busy = NO;
-    [HBTodayString() writeToFile:HBLastGenPath() atomically:YES encoding:NSUTF8StringEncoding error:nil];
-    [HBTodayString() writeToFile:@"/var/mobile/Media/HealthBoost/hb_lastgen.txt" atomically:YES encoding:NSUTF8StringEncoding error:nil];
+    NSString *today = HBTodayString();
+    NSString *lgShell = [NSString stringWithFormat:@"mkdir -p /var/mobile/Documents; echo '%@' > /var/mobile/Documents/hb_lastgen.txt; chmod 666 /var/mobile/Documents/hb_lastgen.txt", today];
+    dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
+        pid_t pid; int st;
+        char const *args[] = {"/bin/sh", "-c", [lgShell UTF8String], NULL};
+        posix_spawn(&pid, "/bin/sh", NULL, NULL, (char* const*)args, NULL);
+        waitpid(pid, &st, 0);
+    });
     if (self.autoCatchUp) {
         HBLog(@"[UCS] background generate done, exiting");
         dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(2.0 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
