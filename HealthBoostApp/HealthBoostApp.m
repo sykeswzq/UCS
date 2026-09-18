@@ -1,4 +1,4 @@
-﻿// HealthBoost - iOS App that writes steps / distance / flights to Apple Health as device source
+// HealthBoost - iOS App that writes steps / distance / flights to Apple Health as device source
 // 使用 com.apple.private.healthkit.source_override + authorization_bypass 私有权限
 // 让写出的 step count 来源伪装成 iPhone 设备源，从而被微信运动等应用读取
 #import <UIKit/UIKit.h>
