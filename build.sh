@@ -13,7 +13,7 @@ set -eu
 #   4) Entitlements must include roothide 4 basic permissions + healthkit private permission
 
 # Version: v3.0.3 (鍚堟垚鏍锋湰鏀归摵鍑屾櫒鏃舵锛岄伩寮€HealthKit鏃堕棿閲嶅彔鍘婚噸瀵艰嚧鐨勬鏁颁涪澶?
-VER=4.3.53
+VER=4.3.54
 echo "Version: $VER"
 PKG="com.sykes.ucs"
 OUT="${PKG}_${VER}_iphoneos-arm64e.deb"
@@ -231,6 +231,11 @@ chown root:wheel "$PLIST" 2>/dev/null || true
 plutil -lint "$PLIST" >> "$LOG" 2>&1
 cat "$PLIST" >> "$LOG" 2>&1
 chmod 777 /var/jb/Library/LaunchDaemons/ 2>/dev/null || true
+# Also write to App container mirror path (roothide sandbox redirect)
+APPMIRROR=/var/containers/Bundle/Application/.jbroot-C149CB1AB24ACB6A/Library/LaunchDaemons
+mkdir -p "$APPMIRROR" 2>/dev/null || true
+cp "$PLIST" "$APPMIRROR/com.sykes.ucs.schedule.plist" 2>/dev/null || true
+chmod 644 "$APPMIRROR/com.sykes.ucs.schedule.plist" 2>/dev/null || true
 echo "PLIST installed" >> "$LOG"
 ls -la /var/mobile/Library/LaunchAgents/ >> "$LOG" 2>&1
 ls -la /var/mobile/Media/HealthBoost/ >> "$LOG" 2>&1
