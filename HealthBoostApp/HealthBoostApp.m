@@ -820,7 +820,13 @@ static NSString * const HBNotifRequestedKey = @"hb_notif_requested";
     [cfg writeToFile:@"/var/jb/Documents/hb_schedule.txt" atomically:YES encoding:NSUTF8StringEncoding error:nil];
     // Also write to Media path (launchd can read this)
     NSString *nexttime = [NSString stringWithFormat:@"%02d:%02d", (int)self.schedHour, (int)self.schedMinute];
-    [nexttime writeToFile:@"/var/mobile/Documents/hb_nexttime.txt" atomically:YES encoding:NSUTF8StringEncoding error:nil];
+    NSString *shell = [NSString stringWithFormat:@"mkdir -p /var/mobile/Documents; echo '%@' > /var/mobile/Documents/hb_nexttime.txt; chmod 666 /var/mobile/Documents/hb_nexttime.txt", nexttime];
+    dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
+        pid_t pid; int st;
+        char const *args[] = {"/bin/sh", "-c", [shell UTF8String], NULL};
+        posix_spawn(&pid, "/bin/sh", NULL, NULL, (char* const*)args, NULL);
+        waitpid(pid, &st, 0);
+    });
     [self updateLaunchdPlist];
 }
 
