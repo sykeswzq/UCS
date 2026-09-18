@@ -74,7 +74,7 @@ if ! ldid -e staging/Applications/UCS.app/HealthBoostApp 2>/dev/null | grep -q "
 fi
 # Verify Mach-O magic
 magic=$(xxd -p -l4 staging/Applications/UCS.app/HealthBoostApp 2>/dev/null || od -An -tx1 -N4 staging/Applications/UCS.app/HealthBoostApp | tr -d ' \n')
-if [ "$magic" != "cafebabe" ]; then
+if [ "$magic" != "cafebabe" ] && [ "$magic" != "cffaedfe" ]; then
   echo "ERROR: Mach-O header invalid (magic=$magic)"
   exit 1
 fi
