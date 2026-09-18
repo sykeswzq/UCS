@@ -1156,12 +1156,12 @@ static const NSTimeInterval kBatchIntervalSeconds = 60;  // 每批时间窗口 6
             // pre-first-real-sample hours which HealthKit ignores (v3.0.3 lesson).
             NSInteger nowMinute = (NSInteger)[now timeIntervalSinceDate:startOfDay] / 60;
             NSInteger floorMin = nowMinute - 120; if (floorMin < 0) floorMin = 0;
-            NSInteger chosenMin = nowMinute;
+            NSInteger chosenMin = nowMinute - 1;
             BOOL found = NO;
-            for (NSInteger m = nowMinute; m >= floorMin; m--) {
+            for (NSInteger m = nowMinute - 1; m >= floorMin; m--) {
                 if (![occupiedMinute containsObject:@(m)]) { chosenMin = m; found = YES; break; }
             }
-            if (!found) chosenMin = nowMinute;  // busy window: lay on now, accept possible dedup
+            if (!found) chosenMin = nowMinute - 1;  // busy window: lay on last completed minute
             [occupiedMinute addObject:@(chosenMin)];
             NSDate *batchStart = [startOfDay dateByAddingTimeInterval:(NSTimeInterval)(chosenMin * 60)];
             NSDate *batchEnd = [batchStart dateByAddingTimeInterval:kBatchIntervalSeconds];
@@ -1297,21 +1297,33 @@ static void HBKillWeChat(void) {
 
 // 生成后自动拉起微信后台，让它读 HealthKit 上传新步数（不用手动开微信）
 static void HBLaunchWeChat(void) {
-    const char *cands[] = {
-        "/var/jb/usr/bin/uiopen", "/usr/bin/uiopen",
-        "/var/jb/usr/bin/open", "/usr/bin/open",
+    // roothide: resolve real path via jbroot() C function
+    void *jb = dlsym(RTLD_DEFAULT, "jbroot");
+    typedef const char* (*jbroot_fn)(const char*);
+    jbroot_fn jb_fn = (jbroot_fn)jb;
+
+    const char *raw[] = {
+        "/var/jb/usr/bin/uiopen",
+        "/var/jb/usr/bin/open",
+        "/usr/bin/uiopen",
+        "/usr/bin/open",
         NULL
     };
-    for (int i = 0; cands[i]; i++) {
-        if (access(cands[i], X_OK) != 0) continue;
+    for (int i = 0; raw[i]; i++) {
+        const char *path = raw[i];
+        if (jb_fn) {
+            const char *resolved = jb_fn(raw[i]);
+            if (resolved && access(resolved, X_OK) == 0) path = resolved;
+        }
+        if (access(path, X_OK) != 0) continue;
         pid_t pid;
-        char *const argv[] = { (char *)cands[i], "com.tencent.xin", NULL };
-        if (posix_spawn(&pid, cands[i], NULL, NULL, argv, NULL) == 0) {
-            HBLog(@"[UCS] launched WeChat via %s", cands[i]);
+        char *const argv[] = { (char *)path, "com.tencent.xin", NULL };
+        if (posix_spawn(&pid, path, NULL, NULL, argv, NULL) == 0) {
+            HBLog(@"[UCS] launched WeChat via %s", path);
             return;
         }
     }
-    HBLog(@"[UCS] no launcher found, WeChat not auto-launched");
+    HBLog(@"[UCS] no launcher found (jb=%p), WeChat not auto-launched", jb);
 }
 
 - (void)finishSuccess:(HKSourceRevision *)deviceRev {
