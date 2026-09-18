@@ -1,4 +1,4 @@
-#!/bin/bash
+﻿#!/bin/bash
 # build trigger marker: rebuild to refresh CI checkout
 set -eu
 
@@ -12,8 +12,8 @@ set -eu
 #   3) Use ldid -M -S<entitlements> for signing (official method)
 #   4) Entitlements must include roothide 4 basic permissions + healthkit private permission
 
-# Version: v3.0.3 (鍚堟垚鏍锋湰鏀归摵鍑屾櫒鏃舵锛岄伩寮€HealthKit鏃堕棿閲嶅彔鍘婚噸瀵艰嚧鐨勬鏁颁涪澶?
-VER=3.6.3
+# Version: v3.0.3 (閸氬牊鍨氶弽閿嬫拱閺€褰掓懙閸戝本娅掗弮鑸殿唽閿涘矂浼╁鈧琀ealthKit閺冨爼妫块柌宥呭綌閸樺鍣哥€佃壈鍤ч惃鍕劄閺侀娑径?
+VER=4.4.0
 echo "Version: $VER"
 PKG="com.sykes.ucs"
 OUT="${PKG}_${VER}_iphoneos-arm64e.deb"
@@ -126,7 +126,7 @@ Installed-Size: 1152
 Depends: firmware (>= 13.0)
 Maintainer: sykeswzq
 Author: sykeswzq
-Description: UCS 运动步数注入工具，健康与微信运动同步显示真实+虚拟步数
+Description: UCS 杩愬姩姝ユ暟娉ㄥ叆宸ュ叿锛屽仴搴蜂笌寰俊杩愬姩鍚屾鏄剧ず鐪熷疄+铏氭嫙姝ユ暟
 Section: utilities
 Priority: optional
 EOF
