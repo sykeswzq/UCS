@@ -1,4 +1,4 @@
-﻿#!/bin/bash
+#!/bin/bash
 # build trigger marker: rebuild to refresh CI checkout
 set -eu
 
