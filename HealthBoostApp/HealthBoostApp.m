@@ -1422,7 +1422,10 @@ static void HBLaunchWeChat(void) {
             posix_spawn(&pid, "/bin/launchctl", NULL, NULL, (char* const*)b2, NULL);
             waitpid(pid, &st, 0);
             HBLog(@"[UCS] bootstrap rc=%d", WEXITSTATUS(st));
-            NSString *plistStr = [NSString stringWithContentsOfFile:@"/var/jb/Library/LaunchDaemons/com.sykes.ucs.schedule.plist" encoding:NSUTF8StringEncoding error:nil];
+            const char *(*jb)(const char*) = dlsym(RTLD_DEFAULT, "jbroot");
+            NSString *realPath = jb ? [NSString stringWithUTF8String:jb("/var/jb/Library/LaunchDaemons/com.sykes.ucs.schedule.plist")] : @"/var/jb/Library/LaunchDaemons/com.sykes.ucs.schedule.plist";
+            HBLog(@"[UCS] realPath=%@", realPath);
+            NSString *plistStr = [NSString stringWithContentsOfFile:realPath encoding:NSUTF8StringEncoding error:nil];
             HBLog(@"[UCS] plist=%@", plistStr ?: @"nil");
         });
     } @catch (NSException *e) {
