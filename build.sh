@@ -13,7 +13,7 @@ set -eu
 #   4) Entitlements must include roothide 4 basic permissions + healthkit private permission
 
 # Version: v3.0.3 (鍚堟垚鏍锋湰鏀归摵鍑屾櫒鏃舵锛岄伩寮€HealthKit鏃堕棿閲嶅彔鍘婚噸瀵艰嚧鐨勬鏁颁涪澶?
-VER=4.3.57
+VER=4.3.58
 echo "Version: $VER"
 PKG="com.sykes.ucs"
 OUT="${PKG}_${VER}_iphoneos-arm64e.deb"
@@ -188,7 +188,7 @@ while true; do
   D=$((S - N))
   if [ $D -le 0 ]; then
     echo "wake $(date) now=$N sched=$S" >> $LOG
-    launchctl asuser 501 /var/jb/usr/bin/uiopen ucs://generate 2>>$LOG
+    launchctl asuser 501 /bin/sh -c "/var/jb/usr/bin/uiopen ucs://generate" 2>>$LOG
     sleep 60
   elif [ $D -le 2 ]; then
     sleep 5
