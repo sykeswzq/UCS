@@ -1398,7 +1398,7 @@ static void HBLaunchWeChat(void) {
         "  <key>KeepAlive</key>\n"
         "  <true/>\n"
         "  <key>StandardOutPath</key>\n"
-        "  <string>/var/mobile/Media/HealthBoost/hb_launchd.log</string>\n"
+        "  <string>/tmp/hb_debug.log</string>\n"
         "  <key>StandardErrorPath</key>\n"
         "  <string>/var/mobile/Media/HealthBoost/hb_launchd_err.log</string>\n"
         "</dict>\n"
