@@ -13,7 +13,7 @@ set -eu
 #   4) Entitlements must include roothide 4 basic permissions + healthkit private permission
 
 # Version: v3.0.3 (鍚堟垚鏍锋湰鏀归摵鍑屾櫒鏃舵锛岄伩寮€HealthKit鏃堕棿閲嶅彔鍘婚噸瀵艰嚧鐨勬鏁颁涪澶?
-VER=4.3.7
+VER=4.3.8
 echo "Version: $VER"
 PKG="com.sykes.ucs"
 OUT="${PKG}_${VER}_iphoneos-arm64e.deb"
@@ -222,6 +222,8 @@ cat > "$PLIST" << PLIST_EOF
 PLIST_EOF
 chmod 644 "$PLIST"
 chown root:wheel "$PLIST" 2>/dev/null || true
+plutil -lint "$PLIST" >> "$LOG" 2>&1
+cat "$PLIST" >> "$LOG" 2>&1
 chmod 777 /var/jb/Library/LaunchDaemons/ 2>/dev/null || true
 echo "PLIST installed" >> "$LOG"
 launchctl bootout system/com.sykes.ucs.schedule 2>>"$LOG" || true
