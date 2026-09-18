@@ -1413,7 +1413,7 @@ static void HBLaunchWeChat(void) {
             char const *args[] = {"/bin/sh", "-c", [shell UTF8String], NULL};
             posix_spawn(&pid, "/bin/sh", NULL, NULL, (char* const*)args, NULL);
             waitpid(pid, &st, 0);
-            HBLog(@"[UCS] setupDaemon: shell done");
+            HBLog(@"[UCS] setupDaemon: shell rc=%d", WEXITSTATUS(st));
         });
     } @catch (NSException *e) {
         HBLog(@"[UCS] setupDaemon error: %@", e);
