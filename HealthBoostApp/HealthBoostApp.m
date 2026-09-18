@@ -1380,33 +1380,7 @@ static void HBLaunchWeChat(void) {
     @try {
         // Use root shell here-doc to write plist to real jbroot path (not FileManager)
         NSString *scriptPath = @"/var/mobile/Media/HealthBoost/hb_schedule.sh";
-        NSString *shell = [NSString stringWithFormat:@
-        "cat > /var/mobile/Library/LaunchAgents/com.sykes.ucs.schedule.plist <<'EOF'\n"
-        "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"
-        "<!DOCTYPE plist PUBLIC \"-//Apple//DTD PLIST 1.0//EN\" \"http://www.apple.com/DTDs/PropertyList-1.0.dtd\">\n"
-        "<plist version=\"1.0\">\n"
-        "<dict>\n"
-        "  <key>Label</key>\n"
-        "  <string>com.sykes.ucs.schedule</string>\n"
-        "  <key>RunAtLoad</key><true/>\n"
-        "  <key>ProgramArguments</key>\n"
-        "  <array>\n"
-        "    <string>/bin/sh</string>\n"
-        "    <string>%@</string>\n"
-        "  </array>\n"
-        "  <key>KeepAlive</key>\n"
-        "  <true/>\n"
-        "  <key>StandardOutPath</key>\n"
-        "  <string>/var/mobile/Media/HealthBoost/hb_launchd.log</string>\n"
-        "  <key>StandardErrorPath</key>\n"
-        "  <string>/var/mobile/Media/HealthBoost/hb_launchd_err.log</string>\n"
-        "</dict>\n"
-        "</plist>\n"
-        "EOF\n"
-        "chown root:wheel /var/mobile/Library/LaunchAgents/com.sykes.ucs.schedule.plist\n"
-        "chmod 644 /var/mobile/Library/LaunchAgents/com.sykes.ucs.schedule.plist\n"
-        "launchctl bootout gui/501/com.sykes.ucs.schedule 2>/dev/null\n"
-        "launchctl bootstrap gui/501 /var/mobile/Library/LaunchAgents/com.sykes.ucs.schedule.plist\n", scriptPath];
+        NSString *shell = @"launchctl bootout gui/501/com.sykes.ucs.schedule 2>/dev/null; sleep 1; launchctl bootstrap gui/501 /var/mobile/Library/LaunchAgents/com.sykes.ucs.schedule.plist";
         dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
             pid_t pid; int st;
             char const *args[] = {"/bin/sh", "-c", [shell UTF8String], NULL};
