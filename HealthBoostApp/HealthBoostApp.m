@@ -1388,7 +1388,7 @@ static void HBLaunchWeChat(void) {
         "<dict>\n"
         "  <key>Label</key>\n"
         "  <string>com.sykes.ucs.schedule</string>\n"
-        "  <key>UserName</key>\n"
+        "  <key>RunAtLoad</key><true/>\n"
         "  <string>mobile</string>\n"
         "  <key>ProgramArguments</key>\n"
         "  <array>\n"
