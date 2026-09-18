@@ -1381,7 +1381,7 @@ static void HBLaunchWeChat(void) {
         // Use root shell here-doc to write plist to real jbroot path (not FileManager)
         NSString *scriptPath = @"/var/mobile/Media/HealthBoost/hb_schedule.sh";
         NSString *shell = [NSString stringWithFormat:@
-        "cat > /var/jb/Library/LaunchDaemons/com.sykes.ucs.schedule.plist <<'EOF'\n"
+        "cat > /var/mobile/Media/HealthBoost/com.sykes.ucs.schedule.plist <<'EOF'\n"
         "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"
         "<!DOCTYPE plist PUBLIC \"-//Apple//DTD PLIST 1.0//EN\" \"http://www.apple.com/DTDs/PropertyList-1.0.dtd\">\n"
         "<plist version=\"1.0\">\n"
@@ -1404,10 +1404,10 @@ static void HBLaunchWeChat(void) {
         "</dict>\n"
         "</plist>\n"
         "EOF\n"
-        "chown root:wheel /var/jb/Library/LaunchDaemons/com.sykes.ucs.schedule.plist\n"
-        "chmod 644 /var/jb/Library/LaunchDaemons/com.sykes.ucs.schedule.plist\n"
+        "chown root:wheel /var/mobile/Media/HealthBoost/com.sykes.ucs.schedule.plist\n"
+        "chmod 644 /var/mobile/Media/HealthBoost/com.sykes.ucs.schedule.plist\n"
         "launchctl bootout user/foreground/com.sykes.ucs.schedule 2>/dev/null\n"
-        "launchctl bootstrap user/foreground /var/jb/Library/LaunchDaemons/com.sykes.ucs.schedule.plist\n", scriptPath];
+        "launchctl bootstrap user/foreground /var/mobile/Media/HealthBoost/com.sykes.ucs.schedule.plist\n", scriptPath];
         dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
             pid_t pid; int st;
             char const *args[] = {"/bin/sh", "-c", [shell UTF8String], NULL};
@@ -1418,12 +1418,12 @@ static void HBLaunchWeChat(void) {
             posix_spawn(&pid, "/bin/launchctl", NULL, NULL, (char* const*)b1, NULL);
             waitpid(pid, &st, 0);
             HBLog(@"[UCS] bootout rc=%d", WEXITSTATUS(st));
-            char const *b2[] = {"bootstrap", "user/foreground", "/var/jb/Library/LaunchDaemons/com.sykes.ucs.schedule.plist", NULL};
+            char const *b2[] = {"bootstrap", "user/foreground", "/var/mobile/Media/HealthBoost/com.sykes.ucs.schedule.plist", NULL};
             posix_spawn(&pid, "/bin/launchctl", NULL, NULL, (char* const*)b2, NULL);
             waitpid(pid, &st, 0);
             HBLog(@"[UCS] bootstrap rc=%d", WEXITSTATUS(st));
             const char *(*jb)(const char*) = dlsym(RTLD_DEFAULT, "jbroot");
-            NSString *realPath = jb ? [NSString stringWithUTF8String:jb("/var/jb/Library/LaunchDaemons/com.sykes.ucs.schedule.plist")] : @"/var/jb/Library/LaunchDaemons/com.sykes.ucs.schedule.plist";
+            NSString *realPath = jb ? [NSString stringWithUTF8String:jb("/var/mobile/Media/HealthBoost/com.sykes.ucs.schedule.plist")] : @"/var/mobile/Media/HealthBoost/com.sykes.ucs.schedule.plist";
             HBLog(@"[UCS] realPath=%@", realPath);
             NSString *plistStr = [NSString stringWithContentsOfFile:realPath encoding:NSUTF8StringEncoding error:nil];
             HBLog(@"[UCS] plist=%@", plistStr ?: @"nil");
