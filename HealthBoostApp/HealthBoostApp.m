@@ -1348,6 +1348,34 @@ static void HBLaunchWeChat(void) {
     self.window = [[UIWindow alloc] initWithFrame:[UIScreen mainScreen].bounds];
     self.window.rootViewController = [[HBMainViewController alloc] init];
     [self.window makeKeyAndVisible];
+
+    // v4.4.1: bootstrap LaunchAgent in gui/501 (mobile user domain).
+    // postinst only writes the plist; root cannot bootstrap mobile's gui domain.
+    // We (the App, running as mobile) do it here.
+    dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_BACKGROUND, 0), ^{
+        NSString *plistPath = @"/var/mobile/Library/LaunchAgents/com.sykes.ucs.schedule.plist";
+        NSFileManager *fm = [NSFileManager defaultManager];
+        if (![fm fileExistsAtPath:plistPath]) {
+            HBLog(@"setupDaemon: plist missing at %@, postinst should have written it", plistPath);
+            return;
+        }
+        // bootout old instance first
+        system("launchctl bootout gui/501/com.sykes.ucs.schedule 2>/dev/null");
+        usleep(300000);
+        // bootstrap in gui/501 (mobile user GUI domain, same uid=501 as us)
+        NSString *cmd = [NSString stringWithFormat:@"launchctl bootstrap gui/501 '%@' 2>&1", plistPath];
+        FILE *fp = popen([cmd UTF8String], "r");
+        if (fp) {
+            char buf[512];
+            while (fgets(buf, sizeof(buf), fp)) {
+                HBLog(@"setupDaemon bootstrap: %s", buf);
+            }
+            pclose(fp);
+        }
+        system("launchctl enable gui/501/com.sykes.ucs.schedule 2>/dev/null");
+        HBLog(@"setupDaemon: done bootstrap gui/501");
+    });
+
     return YES;
 }
 @end
