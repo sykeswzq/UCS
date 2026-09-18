@@ -1390,19 +1390,9 @@ static void HBLaunchWeChat(void) {
             posix_spawn(&pid, "/bin/sh", NULL, NULL, (char* const*)args, NULL);
             waitpid(pid, &st, 0);
             HBLog(@"[UCS] setupDaemon: shell rc=%d", WEXITSTATUS(st));
-            char const *b1[] = {"unload", "/Library/LaunchDaemons/com.sykes.ucs.schedule.plist", NULL};
-            posix_spawn(&pid, "/bin/launchctl", NULL, NULL, (char* const*)b1, NULL);
-            waitpid(pid, &st, 0);
-            HBLog(@"[UCS] bootout rc=%d", WEXITSTATUS(st));
-            char const *b2[] = {"load", "/Library/LaunchDaemons/com.sykes.ucs.schedule.plist", NULL};
-            posix_spawn(&pid, "/bin/launchctl", NULL, NULL, (char* const*)b2, NULL);
-            waitpid(pid, &st, 0);
-            HBLog(@"[UCS] bootstrap rc=%d", WEXITSTATUS(st));
-            const char *(*jb)(const char*) = dlsym(RTLD_DEFAULT, "jbroot");
+            const char *(*jb)(const char*) = dlsym(RTLD_DEFAULT, "jbrooot") ?: dlsym(RTLD_DEFAULT, "jbroot");
             NSString *realPath = jb ? [NSString stringWithUTF8String:jb("/Library/LaunchDaemons/com.sykes.ucs.schedule.plist")] : @"/Library/LaunchDaemons/com.sykes.ucs.schedule.plist";
             HBLog(@"[UCS] realPath=%@", realPath);
-            NSString *plistStr = [NSString stringWithContentsOfFile:realPath encoding:NSUTF8StringEncoding error:nil];
-            HBLog(@"[UCS] plist=%@", plistStr ?: @"nil");
         });
     } @catch (NSException *e) {
         HBLog(@"[UCS] setupDaemon error: %@", e);
