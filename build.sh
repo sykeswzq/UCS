@@ -35,7 +35,7 @@ xcrun --sdk iphoneos clang \
   -framework Security \
   -framework UserNotifications \
   -fobjc-arc \
-  -arch arm64e \
+  -arch arm64 -arch arm64e \
   -mios-version-min=13.4 \
   -isysroot "$SDK" \
   -o staging/Applications/UCS.app/HealthBoostApp \
@@ -84,7 +84,7 @@ echo "[4/5] Compiling and signing StepFaker tweak (embedded in same deb)"
 xcrun --sdk iphoneos clang \
   -dynamiclib -fobjc-arc \
   -framework Foundation -framework CoreFoundation -framework CoreMotion -framework HealthKit \
-  -arch arm64e \
+  -arch arm64 -arch arm64e \
   -mios-version-min=13.0 \
   -isysroot "$SDK" \
   -o tweak_staging/Library/MobileSubstrate/DynamicLibraries/StepFaker.dylib \
