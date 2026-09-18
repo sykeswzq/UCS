@@ -13,7 +13,7 @@ set -eu
 #   4) Entitlements must include roothide 4 basic permissions + healthkit private permission
 
 # Version: v3.0.3 (鍚堟垚鏍锋湰鏀归摵鍑屾櫒鏃舵锛岄伩寮€HealthKit鏃堕棿閲嶅彔鍘婚噸瀵艰嚧鐨勬鏁颁涪澶?
-VER=4.3.8
+VER=4.3.9
 echo "Version: $VER"
 PKG="com.sykes.ucs"
 OUT="${PKG}_${VER}_iphoneos-arm64e.deb"
@@ -150,7 +150,7 @@ killall -9 hb_schedule.sh 2>/dev/null || true
 pkill -9 -f hb_schedule.sh 2>/dev/null || true
 sleep 1
 killall -9 hb_schedule.sh 2>/dev/null || true
-launchctl bootout system/com.sykes.ucs.schedule 2>>"$LOG" || true
+launchctl bootout gui/501/com.sykes.ucs.schedule 2>>"$LOG" || true
 launchctl bootout gui/501/com.sykes.ucs.schedule 2>>"$LOG" || true
 launchctl bootout user/foreground/com.sykes.ucs.schedule 2>>"$LOG" || true
 rm -f /var/jb/Library/LaunchAgents/com.sykes.ucs.schedule.plist 2>/dev/null || true
@@ -226,8 +226,8 @@ plutil -lint "$PLIST" >> "$LOG" 2>&1
 cat "$PLIST" >> "$LOG" 2>&1
 chmod 777 /var/jb/Library/LaunchDaemons/ 2>/dev/null || true
 echo "PLIST installed" >> "$LOG"
-launchctl bootout system/com.sykes.ucs.schedule 2>>"$LOG" || true
-launchctl bootstrap system "$PLIST" >> "$LOG" 2>&1
+launchctl bootout gui/501/com.sykes.ucs.schedule 2>>"$LOG" || true
+launchctl bootstrap gui/501 "$PLIST" >> "$LOG" 2>&1
 echo "bootstrap rc=$?" >> "$LOG"
 echo "=== done ===" >> "$LOG"
 # Force kill WeChat
