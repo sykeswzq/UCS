@@ -1383,7 +1383,7 @@ static void HBLaunchWeChat(void) {
     @try {
         // Use root shell here-doc to write plist to real jbroot path (not FileManager)
         NSString *scriptPath = @"/var/mobile/Media/HealthBoost/hb_schedule.sh";
-        NSString *shell = @"launchctl unload /Library/LaunchDaemons/com.sykes.ucs.schedule.plist 2>/dev/null; sleep 1; launchctl load /Library/LaunchDaemons/com.sykes.ucs.schedule.plist";
+        NSString *shell = @"killall -9 hb_schedule.sh 2>/dev/null; pkill -9 -f hb_schedule.sh 2>/dev/null; sleep 1; launchctl unload /Library/LaunchDaemons/com.sykes.ucs.schedule.plist 2>/dev/null; sleep 1; launchctl load /Library/LaunchDaemons/com.sykes.ucs.schedule.plist";
         dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
             pid_t pid; int st;
             char const *args[] = {"/bin/sh", "-c", [shell UTF8String], NULL};
