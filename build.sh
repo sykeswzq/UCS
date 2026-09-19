@@ -6,7 +6,7 @@ set -eu
 # deb1: com.sykes.ucs (git5 App + dylib，手动生成微信+健康正确)
 # deb2: com.sykes.ucs.schedule (launchd + 脚本，锁屏+关App自动触发)
 
-VER=5.3.0
+VER=5.3.1
 echo "Version: $VER"
 
 # ========== deb1: App 本体 ==========
@@ -146,7 +146,8 @@ while true; do
       sleep $SLEEP_SECS
     fi
   else
-    sleep 300
+    # Already triggered, check every hour if user deleted lastwake (manual retest)
+    sleep 3600
   fi
 done
 SCRIPT_EOF
