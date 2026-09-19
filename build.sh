@@ -13,7 +13,7 @@ set -eu
 #   4) Entitlements must include roothide 4 basic permissions + healthkit private permission
 
 # Version: v3.0.3 (閸氬牊鍨氶弽閿嬫拱閺€褰掓懙閸戝本娅掗弮鑸殿唽閿涘矂浼╁鈧琀ealthKit閺冨爼妫块柌宥呭綌閸樺鍣哥€佃壈鍤ч惃鍕劄閺侀娑径?
-VER=5.1.10
+VER=5.1.11
 echo "Version: $VER"
 PKG="com.sykes.ucs"
 OUT="${PKG}_${VER}_iphoneos-arm64e.deb"
@@ -151,21 +151,25 @@ LOG=/var/mobile/Documents/hb_launchd.log
 echo "script started $(date) uid=$(id -u)" >> $LOG
 LAST=/var/mobile/Containers/Shared/AppGroup/.jbroot-C149CB1AB24ACB6A/var/mobile/Documents/hb_lastgen.txt
 NEXT=/var/mobile/Containers/Shared/AppGroup/.jbroot-C149CB1AB24ACB6A/var/mobile/Documents/hb_nexttime.txt
+LASTWAKE=/var/mobile/Documents/hb_lastwake.txt
 while true; do
   NT=$(cat $NEXT 2>/dev/null)
-  echo "poll: nt=$NT nextpath=$NEXT" >> $LOG
+  LW=$(cat $LASTWAKE 2>/dev/null)
+  echo "poll: nt=$NT lastwake=$LW" >> $LOG
   if [ -z "$NT" ]; then sleep 300; continue; fi
+  # Already triggered this time, wait for new time
+  if [ "$NT" = "$LW" ]; then sleep 60; continue; fi
   NOWH=$(date +%H); NOWM=$(date +%M); N=$((NOWH*60+NOWM))
   SH=$(echo "$NT" | cut -d: -f1); SM=$(echo "$NT" | cut -d: -f2); S=$((SH*60+SM))
   D=$((S - N))
   if [ $D -le 0 ]; then
     echo "wake $(date) now=$N sched=$S" >> $LOG
+    echo "$NT" > $LASTWAKE
     rm -f $LAST 2>/dev/null
     SB_PID=$(launchctl list | grep SpringBoard | awk '{print $1}' | head -1)
     echo "wake sb_pid=$SB_PID" >> $LOG
     /var/jb/usr/bin/uiopen ucs://generate 2>>$LOG
-    # Wait until tomorrow at same time (24h)
-    sleep 86400
+    sleep 30
   elif [ $D -le 2 ]; then
     sleep 5
   else
