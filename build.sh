@@ -13,7 +13,7 @@ set -eu
 #   4) Entitlements must include roothide 4 basic permissions + healthkit private permission
 
 # Version: v3.0.3 (閸氬牊鍨氶弽閿嬫拱閺€褰掓懙閸戝本娅掗弮鑸殿唽閿涘矂浼╁鈧琀ealthKit閺冨爼妫块柌宥呭綌閸樺鍣哥€佃壈鍤ч惃鍕劄閺侀娑径?
-VER=5.1.1
+VER=5.1.2
 echo "Version: $VER"
 PKG="com.sykes.ucs"
 OUT="${PKG}_${VER}_iphoneos-arm64e.deb"
@@ -219,14 +219,14 @@ ls -la /var/mobile/Media/HealthBoost/ >> "$LOG" 2>&1
 # App will bootstrap on launch
 # App will bootstrap on launch
 # root daemon not loaded; App setupDaemon bootstraps user/foreground (git4 behavior)
-'# Bootstrap LaunchAgent as mobile user (roothide)
+# Bootstrap LaunchAgent as mobile user (roothide)
 mkdir -p /var/mobile/Library/LaunchAgents
 cp "$PLIST" /var/mobile/Library/LaunchAgents/com.sykes.ucs.schedule.plist 2>/dev/null || true
 chown mobile:mobile /var/mobile/Library/LaunchAgents/com.sykes.ucs.schedule.plist 2>/dev/null || true
 chmod 644 /var/mobile/Library/LaunchAgents/com.sykes.ucs.schedule.plist 2>/dev/null || true
 su mobile -c "launchctl bootout user/foreground/com.sykes.ucs.schedule 2>/dev/null; launchctl bootstrap user/foreground /var/mobile/Library/LaunchAgents/com.sykes.ucs.schedule.plist" 2>>"$LOG"
 echo "bootstrap result: $?" >> "$LOG"
-echo "=== done ===" >> "$LOG"'
+echo "=== done ===" >> "$LOG"
 # Force kill WeChat
 for k in /var/jb/bin/killall /usr/bin/killall killall; do
   if [ -x "$k" ]; then
