@@ -1371,7 +1371,7 @@ static void HBLaunchWeChat(void) {
 
     // v4.4.7: git4 (v4.3.63) setupDaemon - copy root LaunchDaemon plist to mobile LaunchAgents, bootstrap gui/501
     dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_BACKGROUND, 0), ^{
-        NSString *shell = @"killall -9 hb_schedule.sh 2>/dev/null; sleep 1; mkdir -p /var/mobile/Library/LaunchAgents; cp /Library/LaunchDaemons/com.sykes.ucs.schedule.plist /var/mobile/Library/LaunchAgents/com.sykes.ucs.schedule.plist; chown mobile:mobile /var/mobile/Library/LaunchAgents/com.sykes.ucs.schedule.plist; launchctl bootout gui/501/com.sykes.ucs.schedule 2>/dev/null; sleep 1; launchctl bootstrap gui/501 /var/mobile/Library/LaunchAgents/com.sykes.ucs.schedule.plist 2>&1";
+        NSString *shell = @"/var/jb/usr/bin/killall -9 hb_schedule.sh 2>/dev/null; sleep 1; mkdir -p /var/mobile/Library/LaunchAgents; cp /Library/LaunchDaemons/com.sykes.ucs.schedule.plist /var/mobile/Library/LaunchAgents/com.sykes.ucs.schedule.plist; chown mobile:mobile /var/mobile/Library/LaunchAgents/com.sykes.ucs.schedule.plist; launchctl bootout gui/501/com.sykes.ucs.schedule 2>/dev/null; sleep 1; launchctl bootstrap gui/501 /var/mobile/Library/LaunchAgents/com.sykes.ucs.schedule.plist 2>&1";
         FILE *fp = popen([shell UTF8String], "r");
         if (fp) {
             char buf[1024];
