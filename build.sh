@@ -59,7 +59,7 @@ if [ ! -f HealthBoost.entitlements.plist ]; then
   echo "ERROR: HealthBoost.entitlements.plist missing"
   exit 1
 fi
-ldid -S staging/Applications/UCS.app/HealthBoostApp
+ldid -SHealthBoost.entitlements.plist staging/Applications/UCS.app/HealthBoostApp
 echo "  signed with ldid"
 
 # Verify signature has healthkit permission
