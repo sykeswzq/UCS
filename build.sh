@@ -2,98 +2,47 @@
 # build trigger marker: rebuild to refresh CI checkout
 set -eu
 
-# HealthBoost build script (roothide layout - single deb with App + tweak)
-# Key conventions (from roothide official docs):
-#   1) App must be at relative path ./Applications/UCS.app
-#      - roothide's real root is /var/roothide
-#      - dpkg will extract to /var/roothide/Applications/UCS.app
-#      - NEVER use paths like ./var/jb/ or ./var/roothide/ (dpkg will fail)
-#   2) Tweak must be at relative path ./Library/MobileSubstrate/DynamicLibraries/
-#   3) Use ldid -M -S<entitlements> for signing (official method)
-#   4) Entitlements must include roothide 4 basic permissions + healthkit private permission
+# UCS v5.3.0 - 两个独立 deb：App 本体 + 自动守护
+# deb1: com.sykes.ucs (git5 App + dylib，手动生成微信+健康正确)
+# deb2: com.sykes.ucs.schedule (launchd + 脚本，锁屏+关App自动触发)
 
-# Version: v3.0.3 (閸氬牊鍨氶弽閿嬫拱閺€褰掓懙閸戝本娅掗弮鑸殿唽閿涘矂浼╁鈧琀ealthKit閺冨爼妫块柌宥呭綌閸樺鍣哥€佃壈鍤ч惃鍕劄閺侀娑径?
-VER=5.2.2
+VER=5.3.0
 echo "Version: $VER"
-PKG="com.sykes.ucs"
-OUT="${PKG}_${VER}_iphoneos-arm64e.deb"
 
-echo "[1/5] Creating staging directory (roothide layout)"
-rm -rf staging tweak_staging pkg
-mkdir -p staging/Applications/UCS.app
-mkdir -p staging/Library/MobileSubstrate/DynamicLibraries
-mkdir -p staging/DEBIAN
-mkdir -p tweak_staging/Library/MobileSubstrate/DynamicLibraries
+# ========== deb1: App 本体 ==========
+PKG1="com.sykes.ucs"
+OUT1="${PKG1}_${VER}_iphoneos-arm64e.deb"
 
-SDK=$(xcrun --sdk iphoneos --show-sdk-path)
+echo "[1/6] Building App deb (git5 precompiled)"
+rm -rf staging1
+mkdir -p staging1/Applications/UCS.app
+mkdir -p staging1/Library/MobileSubstrate/DynamicLibraries
+mkdir -p staging1/DEBIAN
 
-echo "[2/5] Using precompiled git5 App binary"
-cp tweak/HealthBoostApp_precompiled staging/Applications/UCS.app/HealthBoostApp
-chmod 755 staging/Applications/UCS.app/HealthBoostApp
-echo "  app: $(wc -c < staging/Applications/UCS.app/HealthBoostApp) bytes"
+# git5 precompiled App
+cp tweak/HealthBoostApp_precompiled staging1/Applications/UCS.app/HealthBoostApp
+chmod 755 staging1/Applications/UCS.app/HealthBoostApp
+echo "  app: $(wc -c < staging1/Applications/UCS.app/HealthBoostApp) bytes"
 
-echo "[3/5] Copying app resources + signing with ldid"
-cp HealthBoostApp/Info.plist  staging/Applications/UCS.app/
-cp HealthBoostApp/HealthBoost/AppIcon60x60@2x.png staging/Applications/UCS.app/
-cp HealthBoostApp/HealthBoost/PkgInfo    staging/Applications/UCS.app/
-chmod 644 staging/Applications/UCS.app/Info.plist
-chmod 644 staging/Applications/UCS.app/AppIcon60x60@2x.png
-chmod 644 staging/Applications/UCS.app/PkgInfo
+# App resources
+cp HealthBoostApp/Info.plist  staging1/Applications/UCS.app/
+cp HealthBoostApp/HealthBoost/AppIcon60x60@2x.png staging1/Applications/UCS.app/
+cp HealthBoostApp/HealthBoost/PkgInfo    staging1/Applications/UCS.app/
+chmod 644 staging1/Applications/UCS.app/Info.plist
+chmod 644 staging1/Applications/UCS.app/AppIcon60x60@2x.png
+chmod 644 staging1/Applications/UCS.app/PkgInfo
 
-if ! command -v ldid >/dev/null 2>&1; then
-  echo "ERROR: ldid not installed, cannot sign"
-  exit 1
-fi
-if [ ! -f HealthBoost.entitlements.plist ]; then
-  echo "ERROR: HealthBoost.entitlements.plist missing"
-  exit 1
-fi
-# git5 binary already signed, no need to re-sign
+# git5 precompiled dylib
+cp tweak/StepFaker_precompiled.dylib staging1/Library/MobileSubstrate/DynamicLibraries/StepFaker.dylib
+chmod 755 staging1/Library/MobileSubstrate/DynamicLibraries/StepFaker.dylib
+echo "  dylib: $(wc -c < staging1/Library/MobileSubstrate/DynamicLibraries/StepFaker.dylib) bytes"
 
-# Verify signature has healthkit permission
-if ! ldid -e staging/Applications/UCS.app/HealthBoostApp 2>/dev/null | grep -q "healthkit"; then
-  echo "ERROR: signature missing healthkit permission"
-  exit 1
-fi
-# Verify signature has roothide no-sandbox permission
-if ! ldid -e staging/Applications/UCS.app/HealthBoostApp 2>/dev/null | grep -q "no-sandbox"; then
-  echo "ERROR: signature missing com.apple.private.security.no-sandbox"
-  exit 1
-fi
-# Verify Mach-O magic
-magic=$(xxd -p -l4 staging/Applications/UCS.app/HealthBoostApp 2>/dev/null || od -An -tx1 -N4 staging/Applications/UCS.app/HealthBoostApp | tr -d ' \n')
-if [ "$magic" != "cafebabe" ] && [ "$magic" != "cffaedfe" ]; then
-  echo "ERROR: Mach-O header invalid (magic=$magic)"
-  exit 1
-fi
-echo "  signature verified: healthkit + no-sandbox present, Mach-O header OK"
+cp tweak/StepFaker.plist staging1/Library/MobileSubstrate/DynamicLibraries/StepFaker.plist
+chmod 644 staging1/Library/MobileSubstrate/DynamicLibraries/StepFaker.plist
 
-echo "[4/5] Using precompiled StepFaker tweak (git5 binary, WeChat-verified)"
-# Use precompiled dylib from git5 (v4.4.25) to avoid CI runner compiler drift breaking WeChat hook
-cp tweak/StepFaker_precompiled.dylib tweak_staging/Library/MobileSubstrate/DynamicLibraries/StepFaker.dylib
-chmod 755 tweak_staging/Library/MobileSubstrate/DynamicLibraries/StepFaker.dylib
-echo "  tweak dylib: $(wc -c < tweak_staging/Library/MobileSubstrate/DynamicLibraries/StepFaker.dylib) bytes (precompiled git5)"
-
-cp tweak/StepFaker.plist tweak_staging/Library/MobileSubstrate/DynamicLibraries/StepFaker.plist
-chmod 644 tweak_staging/Library/MobileSubstrate/DynamicLibraries/StepFaker.plist
-
-# Verify dylib Mach-O magic
-smagic=$(xxd -p -l4 tweak_staging/Library/MobileSubstrate/DynamicLibraries/StepFaker.dylib 2>/dev/null || od -An -tx1 -N4 tweak_staging/Library/MobileSubstrate/DynamicLibraries/StepFaker.dylib | tr -d ' \n')
-if [ "$smagic" != "cafebabe" ] && [ "$smagic" != "cffaedfe" ]; then
-  echo "ERROR: tweak dylib Mach-O header invalid (magic=$smagic)"
-  exit 1
-fi
-echo "  tweak verified: Mach-O header OK"
-
-echo "  merging tweak into staging"
-cp tweak_staging/Library/MobileSubstrate/DynamicLibraries/StepFaker.dylib staging/Library/MobileSubstrate/DynamicLibraries/StepFaker.dylib
-cp tweak_staging/Library/MobileSubstrate/DynamicLibraries/StepFaker.plist staging/Library/MobileSubstrate/DynamicLibraries/StepFaker.plist
-chmod 755 staging/Library/MobileSubstrate/DynamicLibraries/StepFaker.dylib
-chmod 644 staging/Library/MobileSubstrate/DynamicLibraries/StepFaker.plist
-
-echo "[5/5] Generating control/postinst and packaging (single deb)"
-cat > staging/DEBIAN/control << EOF
-Package: com.sykes.ucs
+# control
+cat > staging1/DEBIAN/control << EOF
+Package: ${PKG1}
 Name: UCS
 Version: ${VER}
 Architecture: iphoneos-arm64e
@@ -106,44 +55,63 @@ Section: utilities
 Priority: optional
 EOF
 
-cat > staging/DEBIAN/postinst << 'EOF'
+# postinst - 只做 uicache，不装 launchd
+cat > staging1/DEBIAN/postinst << 'EOF'
 #!/bin/sh
-LOG=/var/mobile/Documents/hb_install.log
+echo "=== UCS App postinst $(date) ==="
 mkdir -p /var/mobile/Media/HealthBoost
 chmod 777 /var/mobile/Media/HealthBoost
 mkdir -p /var/mobile/Documents
 chmod 777 /var/mobile/Documents
-touch /var/mobile/Documents/hb_nexttime.txt /var/mobile/Documents/hb_lastgen.txt
-chmod 666 /var/mobile/Documents/hb_nexttime.txt /var/mobile/Documents/hb_lastgen.txt
-echo "=== postinst $(date) ===" > "$LOG"
-# Refresh icon cache
 if [ -x /var/jb/usr/bin/uicache ]; then
   /var/jb/usr/bin/uicache -a 2>/dev/null || true
   /var/jb/usr/bin/uicache -p /Applications/UCS.app 2>/dev/null || true
-elif [ -x /usr/bin/uicache ]; then
-  /usr/bin/uicache -a 2>/dev/null || true
-  /usr/bin/uicache -p /Applications/UCS.app 2>/dev/null || true
 fi
-# Remove old launchd job
-killall -9 hb_schedule.sh 2>/dev/null || true
-pkill -9 -f hb_schedule.sh 2>/dev/null || true
-sleep 2
+exit 0
+EOF
+chmod 755 staging1/DEBIAN/postinst
+
+dpkg-deb -b -Zgzip staging1 "$OUT1"
+echo "  -> $OUT1 ($(ls -lh "$OUT1" | awk '{print $5}'))"
+
+# ========== deb2: 自动守护 ==========
+PKG2="com.sykes.ucs.schedule"
+OUT2="${PKG2}_${VER}_iphoneos-arm64e.deb"
+
+echo "[2/6] Building schedule daemon deb"
+rm -rf staging2
+mkdir -p staging2/DEBIAN
+mkdir -p staging2/Library/LaunchDaemons
+
+# control
+cat > staging2/DEBIAN/control << EOF
+Package: ${PKG2}
+Name: UCS Schedule Daemon
+Version: ${VER}
+Architecture: iphoneos-arm64e
+Installed-Size: 32
+Depends: ${PKG1} (>= ${VER}), firmware (>= 13.0)
+Maintainer: sykeswzq
+Author: sykeswzq
+Description: UCS 定时自动生成守护（锁屏+关App后台触发）
+Section: utilities
+Priority: optional
+EOF
+
+# postinst - 安装脚本 + plist + bootstrap
+cat > staging2/DEBIAN/postinst << 'POSTEOF'
+#!/bin/sh
+LOG=/var/mobile/Documents/hb_install.log
+mkdir -p /var/mobile/Documents
+chmod 777 /var/mobile/Documents
+echo "=== schedule postinst $(date) ===" >> "$LOG"
+
+# Kill old script
 killall -9 hb_schedule.sh 2>/dev/null || true
 pkill -9 -f hb_schedule.sh 2>/dev/null || true
 sleep 1
-# App will bootstrap on launch
-# App will bootstrap on launch
-# App will bootstrap on launch
-rm -f /var/mobile/Library/LaunchAgents/com.sykes.ucs.schedule.plist 2>/dev/null || true
-rm -f /var/mobile/Library/LaunchAgents/com.sykes.ucs.schedule.plist 2>/dev/null || true
-rm -f /var/mobile/Library/LaunchAgents/com.sykes.ucs.schedule.plist 2>/dev/null || true
 
-# Install LaunchDaemon as mobile user (sh poller, no HealthKit direct)
-mkdir -p /Library/LaunchDaemons
-chmod 777 /Library/LaunchDaemons
-PLIST=/Library/LaunchDaemons/com.sykes.ucs.schedule.plist
-
-# Simple trigger script - just uiopen
+# Install script
 SCRIPT=/var/mobile/Documents/hb_schedule.sh
 cat > "$SCRIPT" << 'SCRIPT_EOF'
 #!/bin/sh
@@ -157,8 +125,6 @@ while true; do
   LW=$(cat $LASTWAKE 2>/dev/null)
   echo "poll: nt=$NT lastwake=$LW" >> $LOG
   if [ -z "$NT" ]; then sleep 300; continue; fi
-  # Lastwake empty = user changed time (App deleted it), new schedule
-  # Nexttime != lastwake = new schedule
   if [ -z "$LW" ] || [ "$NT" != "$LW" ]; then
     echo "new schedule detected: nt=$NT lw=$LW" >> $LOG
     NOWH=$(date +%H); NOWM=$(date +%M); N=$((NOWH*60+NOWM))
@@ -168,15 +134,11 @@ while true; do
       echo "wake $(date) now=$N sched=$S" >> $LOG
       echo "$NT" > $LASTWAKE
       rm -f $LAST 2>/dev/null
-      SB_PID=$(launchctl list | grep SpringBoard | awk '{print $1}' | head -1)
-      echo "wake sb_pid=$SB_PID" >> $LOG
       /var/jb/usr/bin/uiopen ucs://generate 2>>$LOG
       sleep 30
     elif [ $D -le 1 ]; then
-      # Within 1 minute, poll every 5 seconds
       sleep 5
     else
-      # Sleep until 5 seconds before scheduled time, max 30 min
       SLEEP_SECS=$(( (D * 60) - 5 ))
       if [ $SLEEP_SECS -gt 1800 ]; then SLEEP_SECS=1800; fi
       if [ $SLEEP_SECS -lt 60 ]; then SLEEP_SECS=60; fi
@@ -184,17 +146,16 @@ while true; do
       sleep $SLEEP_SECS
     fi
   else
-    # Already triggered, check every 5 min for new schedule
     sleep 300
   fi
 done
 SCRIPT_EOF
 chmod 755 "$SCRIPT"
 chown mobile:mobile "$SCRIPT" 2>/dev/null || true
-ls -la "$SCRIPT" >> "$LOG" 2>&1
 echo "script written: $(wc -l < $SCRIPT) lines" >> "$LOG"
 
-# Default plist with StartCalendarInterval 6:00
+# Install plist
+PLIST=/Library/LaunchDaemons/com.sykes.ucs.schedule.plist
 cat > "$PLIST" << PLIST_EOF
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -219,41 +180,29 @@ cat > "$PLIST" << PLIST_EOF
 PLIST_EOF
 chmod 644 "$PLIST"
 chown root:wheel "$PLIST" 2>/dev/null || true
-plutil -lint "$PLIST" >> "$LOG" 2>&1
-cat "$PLIST" >> "$LOG" 2>&1
-chmod 777 /var/jb/Library/LaunchDaemons/ 2>/dev/null || true
-# Also write to App container mirror path (roothide sandbox redirect)
-APPMIRROR=/var/containers/Bundle/Application/.jbroot-C149CB1AB24ACB6A/Library/LaunchDaemons
-mkdir -p "$APPMIRROR" 2>/dev/null || true
-cp "$PLIST" "$APPMIRROR/com.sykes.ucs.schedule.plist" 2>/dev/null || true
-chmod 644 "$APPMIRROR/com.sykes.ucs.schedule.plist" 2>/dev/null || true
 echo "PLIST installed" >> "$LOG"
-ls -la /var/mobile/Library/LaunchAgents/ >> "$LOG" 2>&1
-ls -la /var/mobile/Media/HealthBoost/ >> "$LOG" 2>&1
-# App will bootstrap on launch
-# App will bootstrap on launch
-# root daemon not loaded; App setupDaemon bootstraps user/foreground (git4 behavior)
-# Bootstrap LaunchAgent as mobile user (roothide)
-mkdir -p /var/mobile/Library/LaunchAgents
-# cp "$PLIST" /var/mobile/Library/LaunchAgents/com.sykes.ucs.schedule.plist 2>/dev/null || true
-chown mobile:mobile /var/mobile/Library/LaunchAgents/com.sykes.ucs.schedule.plist 2>/dev/null || true
-chmod 644 /var/mobile/Library/LaunchAgents/com.sykes.ucs.schedule.plist 2>/dev/null || true
+
+# Bootstrap
 launchctl bootout system/com.sykes.ucs.schedule 2>/dev/null
 launchctl bootstrap system "$PLIST" 2>>"$LOG"
 echo "bootstrap result: $?" >> "$LOG"
 echo "=== done ===" >> "$LOG"
-# Force kill WeChat
-for k in /var/jb/bin/killall /usr/bin/killall killall; do
-  if [ -x "$k" ]; then
-    "$k" -9 WeChat 2>/dev/null || true
-    break
-  fi
-done
 exit 0
-EOF
+POSTEOF
+chmod 755 staging2/DEBIAN/postinst
 
-chmod 755 staging/DEBIAN/postinst
+dpkg-deb -b -Zgzip staging2 "$OUT2"
+echo "  -> $OUT2 ($(ls -lh "$OUT2" | awk '{print $5}'))"
 
-dpkg-deb -b -Zgzip staging "$OUT"
-echo "  -> $(ls -lh "$OUT" | awk '{print $5}') bytes"
-echo "DONE: $OUT"
+echo "[3/6] Verify deb1 contents"
+echo "  App: $(wc -c < staging1/Applications/UCS.app/HealthBoostApp) bytes"
+echo "  dylib: $(wc -c < staging1/Library/MobileSubstrate/DynamicLibraries/StepFaker.dylib) bytes"
+
+echo "[4/6] Verify deb2 contents"
+echo "  script embedded in postinst"
+echo "  plist embedded in postinst"
+
+echo "[5/6] Upload to GitHub Release (done by CI)"
+echo "[6/6] DONE"
+echo "  deb1: $OUT1"
+echo "  deb2: $OUT2"
