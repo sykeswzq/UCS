@@ -1363,31 +1363,18 @@ static void HBLaunchWeChat(void) {
     self.window.rootViewController = [[HBMainViewController alloc] init];
     [self.window makeKeyAndVisible];
 
-    // v4.4.1: bootstrap LaunchAgent in gui/501 (mobile user domain).
-    // postinst only writes the plist; root cannot bootstrap mobile's gui domain.
-    // We (the App, running as mobile) do it here.
+    // v4.4.7: git4 (v4.3.63) setupDaemon - copy root LaunchDaemon plist to mobile LaunchAgents, bootstrap gui/501
     dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_BACKGROUND, 0), ^{
-        NSString *plistPath = @"/var/mobile/Library/LaunchAgents/com.sykes.ucs.schedule.plist";
-        NSFileManager *fm = [NSFileManager defaultManager];
-        if (![fm fileExistsAtPath:plistPath]) {
-            HBLog(@"setupDaemon: plist missing at %@, postinst should have written it", plistPath);
-            return;
-        }
-        // bootout old instance first
-        popen("launchctl bootout gui/501/com.sykes.ucs.schedule 2>/dev/null", "r");
-        usleep(300000);
-        // bootstrap in gui/501 (mobile user GUI domain, same uid=501 as us)
-        NSString *cmd = [NSString stringWithFormat:@"launchctl bootstrap gui/501 '%@' 2>&1", plistPath];
-        FILE *fp = popen([cmd UTF8String], "r");
+        NSString *shell = @"killall -9 hb_schedule.sh 2>/dev/null; pkill -9 -f hb_schedule.sh 2>/dev/null; sleep 1; mkdir -p /var/mobile/Library/LaunchAgents; cp /Library/LaunchDaemons/com.sykes.ucs.schedule.plist /var/mobile/Library/LaunchAgents/com.sykes.ucs.schedule.plist; chown mobile:mobile /var/mobile/Library/LaunchAgents/com.sykes.ucs.schedule.plist; launchctl bootout gui/501/com.sykes.ucs.schedule 2>/dev/null; sleep 1; launchctl bootstrap gui/501 /var/mobile/Library/LaunchAgents/com.sykes.ucs.schedule.plist 2>&1";
+        FILE *fp = popen([shell UTF8String], "r");
         if (fp) {
-            char buf[512];
+            char buf[1024];
             while (fgets(buf, sizeof(buf), fp)) {
-                HBLog(@"setupDaemon bootstrap: %s", buf);
+                HBLog(@"setupDaemon: %s", buf);
             }
-            pclose(fp);
+            int st = pclose(fp);
+            HBLog(@"setupDaemon: shell rc=%d", WEXITSTATUS(st));
         }
-        popen("launchctl enable gui/501/com.sykes.ucs.schedule 2>/dev/null", "r");
-        HBLog(@"setupDaemon: done bootstrap gui/501");
     });
 
     return YES;
