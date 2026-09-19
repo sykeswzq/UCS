@@ -1302,21 +1302,47 @@ static void HBKillWeChat(void) {
 }
 
 // 生成后自动拉起微信后台，让它读 HealthKit 上传新步数（不用手动开微信）
+// roothide: resolve real path via jbrooot() to bypass sandbox redirect + spawn_hook
+static NSString *HBResolveRoothidePath(NSString *path) {
+    @try {
+        void *sym = dlsym(RTLD_DEFAULT, "jbroot");
+        if (sym) {
+            typedef const char* (*fn_t)(const char*);
+            fn_t fn = (fn_t)sym;
+            const char *real = fn([path UTF8String]);
+            if (real) {
+                NSString *r = [NSString stringWithUTF8String:real];
+                HBLog(@"[UCS] jbrooot(%@) -> %@", path, r);
+                return r;
+            }
+        }
+    } @catch (NSException *e) {
+        HBLog(@"[UCS] jbrooot exception: %@", e);
+    }
+    return path;
+}
+
 static void HBLaunchWeChat(void) {
-    const char *cands[] = {
-        "/var/jb/usr/bin/uiopen", "/usr/bin/uiopen",
-        "/var/jb/usr/bin/open", "/usr/bin/open",
-        NULL
-    };
-    for (int i = 0; cands[i]; i++) {
-        if (access(cands[i], X_OK) != 0) continue;
+    NSArray *paths = @[
+        @"/var/jb/usr/bin/uiopen",
+        @"/usr/bin/uiopen",
+        @"/var/jb/usr/bin/open",
+        @"/usr/bin/open",
+    ];
+    for (NSString *p in paths) {
+        NSString *realPath = HBResolveRoothidePath(p);
+        const char *cpath = [realPath fileSystemRepresentation];
+        if (access(cpath, X_OK) != 0) {
+            HBLog(@"[UCS] access %s (resolved %s) failed", [p UTF8String], cpath);
+            continue;
+        }
         pid_t pid;
-        char *const argv[] = { (char *)cands[i], "com.tencent.xin", NULL };
-        if (posix_spawn(&pid, cands[i], NULL, NULL, argv, NULL) == 0) {
-            HBLog(@"[UCS] launched WeChat via %s", cands[i]);
+        const char *args[] = { cpath, "com.tencent.xin", NULL };
+        if (posix_spawn(&pid, cpath, NULL, NULL, args, NULL) == 0) {
+            HBLog(@"[UCS] launched WeChat via %s (resolved %s)", [p UTF8String], cpath);
             return;
         }
-        HBLog(@"[UCS] spawn %s failed errno=%d", cands[i], errno);
+        HBLog(@"[UCS] spawn %s (resolved %s) failed errno=%d", [p UTF8String], cpath, errno);
     }
     HBLog(@"[UCS] no launcher found, WeChat not auto-launched");
 }
