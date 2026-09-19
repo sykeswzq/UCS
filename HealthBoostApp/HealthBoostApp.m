@@ -21,7 +21,7 @@ static NSString * const HBSettingsKey = @"com.sykes.ucs.settings";
 
 // 追加一行到指定路径，并自动裁剪为滚动日志（最多保留 HB_MAX_LOG_LINES 行）
 // 防止日志无限增长导致 UIPasteboard 复制失败 / 弹窗截断。
-static const NSInteger HB_MAX_LOG_LINES = 200;
+static const NSInteger HB_MAX_LOG_LINES = 500;
 
 static void HBAppendLine(NSString *path, NSString *line) {
     NSFileManager *fm = [NSFileManager defaultManager];
