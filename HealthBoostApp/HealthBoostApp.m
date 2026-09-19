@@ -1117,9 +1117,12 @@ static const NSTimeInterval kBatchIntervalSeconds = 60;  // 每批时间窗口 6
         for (HKSample *s in (results ?: @[])) {
             BOOL isSyn = [s.metadata[HBSyntheticStepMetaKey] boolValue];
             if (isSyn) { [syntheticSamples addObject:s]; continue; }
-            NSInteger secs = (NSInteger)[s.startDate timeIntervalSinceDate:startOfDay];
-            NSInteger minuteIdx = secs / 60;
-            if (minuteIdx >= 0) [occupiedMinute addObject:@(minuteIdx)];
+            NSInteger secsStart = (NSInteger)[s.startDate timeIntervalSinceDate:startOfDay];
+            NSInteger secsEnd = (NSInteger)[s.endDate timeIntervalSinceDate:startOfDay];
+            NSInteger mStart = secsStart / 60;
+            NSInteger mEnd = secsEnd / 60;
+            if (mStart < 0) mStart = 0;
+            for (NSInteger m = mStart; m <= mEnd; m++) [occupiedMinute addObject:@(m)];
         }
         HBLog(@"[UCS] writeVirtual: found %lu synthetic, %lu occupied minutes",
               (unsigned long)syntheticSamples.count, (unsigned long)occupiedMinute.count);
