@@ -168,14 +168,18 @@ jobs:
             echo "Release already exists: $TAG (ID: $RELEASE_ID)"
           fi
 
-          # Upload deb to release using curl + PAT (bypasses gh CLI 403)
-          echo "Uploading $DEB to release..."
-          curl -L \
-            -X POST \
-            -H "Authorization: Bearer ${UPLOAD_TOKEN}" \
-            -H "Content-Type: application/zip" \
-            -H "X-GitHub-Api-Version: 2022-11-28" \
-            --data-binary @"${DEB}" \
-            "https://uploads.github.com/repos/sykeswzq/UCS/releases/${RELEASE_ID}/assets?name=${DEB}"
+          # Upload ALL debs to release using curl + PAT
+          for DEB in *_iphoneos-arm64e.deb; do
+            if [ ! -f "$DEB" ]; then continue; fi
+            echo "Uploading $DEB to release..."
+            curl -L \
+              -X POST \
+              -H "Authorization: Bearer ${UPLOAD_TOKEN}" \
+              -H "Content-Type: application/zip" \
+              -H "X-GitHub-Api-Version: 2022-11-28" \
+              --data-binary @"${DEB}" \
+              "https://uploads.github.com/repos/sykeswzq/UCS/releases/${RELEASE_ID}/assets?name=${DEB}"
+            echo "✓ Uploaded: $DEB"
+          done
 
-          echo "✓ Uploaded: https://github.com/sykeswzq/UCS/releases/tag/$TAG"
+          echo "✓ All debs uploaded: https://github.com/sykeswzq/UCS/releases/tag/$TAG"
