@@ -1303,33 +1303,16 @@ static void HBKillWeChat(void) {
 
 // 生成后自动拉起微信后台，让它读 HealthKit 上传新步数（不用手动开微信）
 static void HBLaunchWeChat(void) {
-    // roothide: resolve real path via jbroot() C function
-    void *jb = dlsym(RTLD_DEFAULT, "jbroot");
-    typedef const char* (*jbroot_fn)(const char*);
-    jbroot_fn jb_fn = (jbroot_fn)jb;
-
-    const char *raw[] = {
-        "/var/jb/usr/bin/uiopen",
-        "/var/jb/usr/bin/open",
-        "/usr/bin/uiopen",
-        "/usr/bin/open",
-        NULL
-    };
-    for (int i = 0; raw[i]; i++) {
-        const char *path = raw[i];
-        if (jb_fn) {
-            const char *resolved = jb_fn(raw[i]);
-            if (resolved && access(resolved, X_OK) == 0) path = resolved;
-        }
-        if (access(path, X_OK) != 0) continue;
-        pid_t pid;
-        char *const argv[] = { (char *)path, "com.tencent.xin", NULL };
-        if (posix_spawn(&pid, path, NULL, NULL, argv, NULL) == 0) {
-            HBLog(@"[UCS] launched WeChat via %s", path);
-            return;
-        }
+    // Use popen: sh resolves uiopen via PATH (roothide jbroot() returns broken mirror path)
+    FILE *fp = popen("uiopen com.tencent.xin 2>&1", "r");
+    if (fp) {
+        char buf[256];
+        fgets(buf, sizeof(buf), fp);
+        int rc = pclose(fp);
+        HBLog(@"[UCS] popen uiopen rc=%d out=%s", rc, buf);
+        return;
     }
-    HBLog(@"[UCS] no launcher found (jb=%p), WeChat not auto-launched", jb);
+    HBLog(@"[UCS] popen uiopen failed, WeChat not auto-launched");
 }
 
 - (void)finishSuccess:(HKSourceRevision *)deviceRev {
