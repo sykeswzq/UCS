@@ -786,15 +786,27 @@ static NSString * const HBNotifRequestedKey = @"hb_notif_requested";
 
 - (void)userNotificationCenter:(UNUserNotificationCenter *)center willPresentNotification:(UNNotification *)notification withCompletionHandler:(void (^)(UNNotificationPresentationOptions))completionHandler {
     if ([notification.request.identifier isEqualToString:@"UCSDailyGen"]) {
-        [self loadSettings];   // v1.0.201：App 挂起恢复时 viewDidLoad 不会重跑，先刷新磁盘设置
-        [self generateNow];
+        [self loadSettings];
+        NSString *last = [NSString stringWithContentsOfFile:HBLastGenPath() encoding:NSUTF8StringEncoding error:nil];
+        last = [last stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
+        if ([last isEqualToString:HBTodayString()]) {
+            HBLog(@"[UCS] willPresent: already generated today, skip");
+        } else {
+            [self generateNow];
+        }
     }
     completionHandler(UNNotificationPresentationOptionNone);
 }
 - (void)userNotificationCenter:(UNUserNotificationCenter *)center didReceiveNotificationResponse:(UNNotificationResponse *)response withCompletionHandler:(void(^)(void))completionHandler {
     if ([response.notification.request.identifier isEqualToString:@"UCSDailyGen"]) {
         [self loadSettings];
-        [self generateNow];
+        NSString *last = [NSString stringWithContentsOfFile:HBLastGenPath() encoding:NSUTF8StringEncoding error:nil];
+        last = [last stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
+        if ([last isEqualToString:HBTodayString()]) {
+            HBLog(@"[UCS] didReceive: already generated today, skip");
+        } else {
+            [self generateNow];
+        }
     }
     completionHandler();
 }
