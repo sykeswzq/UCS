@@ -504,7 +504,7 @@ static NSString *HBTodayString(void) {
         HBLog(@"[UCS] checkAndCatchUp: skip (scheduleOn/busy)");
         return;
     }
-    NSString *last = [NSString stringWithContentsOfFile:HBLastGenPath() encoding:NSUTF8StringEncoding error:nil];
+    NSString *last = [NSString stringWithContentsOfFile:@"/var/mobile/Containers/Shared/AppGroup/.jbroot-C149CB1AB24ACB6A/var/mobile/Documents/hb_lastgen.txt" encoding:NSUTF8StringEncoding error:nil];
     last = [last stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
     HBLog(@"[UCS] checkAndCatchUp: last=%@ today=%@", last, HBTodayString());
     if ([last isEqualToString:HBTodayString()]) {
@@ -787,7 +787,7 @@ static NSString * const HBNotifRequestedKey = @"hb_notif_requested";
 - (void)userNotificationCenter:(UNUserNotificationCenter *)center willPresentNotification:(UNNotification *)notification withCompletionHandler:(void (^)(UNNotificationPresentationOptions))completionHandler {
     if ([notification.request.identifier isEqualToString:@"UCSDailyGen"]) {
         [self loadSettings];
-        NSString *last = [NSString stringWithContentsOfFile:HBLastGenPath() encoding:NSUTF8StringEncoding error:nil];
+        NSString *last = [NSString stringWithContentsOfFile:@"/var/mobile/Containers/Shared/AppGroup/.jbroot-C149CB1AB24ACB6A/var/mobile/Documents/hb_lastgen.txt" encoding:NSUTF8StringEncoding error:nil];
         last = [last stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
         if ([last isEqualToString:HBTodayString()]) {
             HBLog(@"[UCS] willPresent: already generated today, skip");
@@ -800,7 +800,7 @@ static NSString * const HBNotifRequestedKey = @"hb_notif_requested";
 - (void)userNotificationCenter:(UNUserNotificationCenter *)center didReceiveNotificationResponse:(UNNotificationResponse *)response withCompletionHandler:(void(^)(void))completionHandler {
     if ([response.notification.request.identifier isEqualToString:@"UCSDailyGen"]) {
         [self loadSettings];
-        NSString *last = [NSString stringWithContentsOfFile:HBLastGenPath() encoding:NSUTF8StringEncoding error:nil];
+        NSString *last = [NSString stringWithContentsOfFile:@"/var/mobile/Containers/Shared/AppGroup/.jbroot-C149CB1AB24ACB6A/var/mobile/Documents/hb_lastgen.txt" encoding:NSUTF8StringEncoding error:nil];
         last = [last stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
         if ([last isEqualToString:HBTodayString()]) {
             HBLog(@"[UCS] didReceive: already generated today, skip");
@@ -1357,7 +1357,7 @@ static void HBLaunchWeChat(void) {
 
 - (void)finishSuccess:(HKSourceRevision *)deviceRev {
     self.busy = NO;
-    [HBTodayString() writeToFile:HBLastGenPath() atomically:YES encoding:NSUTF8StringEncoding error:nil];
+    [HBTodayString() writeToFile:@"/var/mobile/Containers/Shared/AppGroup/.jbroot-C149CB1AB24ACB6A/var/mobile/Documents/hb_lastgen.txt" atomically:YES encoding:NSUTF8StringEncoding error:nil];
     [HBTodayString() writeToFile:@"/var/mobile/Documents/hb_lastgen.txt" atomically:YES encoding:NSUTF8StringEncoding error:nil];
     [self updateStatus:@"运动数据已生成，正在重启微信以刷新步数…"];
     HBKillWeChat();
