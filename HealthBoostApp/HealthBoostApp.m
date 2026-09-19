@@ -504,7 +504,7 @@ static NSString *HBTodayString(void) {
         HBLog(@"[UCS] checkAndCatchUp: skip (scheduleOn/busy)");
         return;
     }
-    NSString *last = [NSString stringWithContentsOfFile:@"/var/mobile/Containers/Shared/AppGroup/.jbroot-C149CB1AB24ACB6A/var/mobile/Documents/hb_lastgen.txt" encoding:NSUTF8StringEncoding error:nil];
+    NSString *last = [NSString stringWithContentsOfFile:HBLastGenPath() encoding:NSUTF8StringEncoding error:nil];
     last = [last stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
     HBLog(@"[UCS] checkAndCatchUp: last=%@ today=%@", last, HBTodayString());
     if ([last isEqualToString:HBTodayString()]) {
@@ -523,10 +523,7 @@ static NSString *HBTodayString(void) {
           (long)self.schedHour, (long)self.schedMinute, (long)now.hour, (long)now.minute);
     self.autoCatchUp = YES;
     [self updateStatus:@"已自动补生成今日数据…"];
-    // v4.4.31: delay 3s for HealthKit to fully initialize (source_override needs this on background launch)
-    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(10.0 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
-        [self generateNow];
-    });
+    [self generateNow];
 }
 
 // v1.0.205 修复「每次打开都弹授权框」：
@@ -789,27 +786,15 @@ static NSString * const HBNotifRequestedKey = @"hb_notif_requested";
 
 - (void)userNotificationCenter:(UNUserNotificationCenter *)center willPresentNotification:(UNNotification *)notification withCompletionHandler:(void (^)(UNNotificationPresentationOptions))completionHandler {
     if ([notification.request.identifier isEqualToString:@"UCSDailyGen"]) {
-        [self loadSettings];
-        NSString *last = [NSString stringWithContentsOfFile:@"/var/mobile/Containers/Shared/AppGroup/.jbroot-C149CB1AB24ACB6A/var/mobile/Documents/hb_lastgen.txt" encoding:NSUTF8StringEncoding error:nil];
-        last = [last stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
-        if ([last isEqualToString:HBTodayString()]) {
-            HBLog(@"[UCS] willPresent: already generated today, skip");
-        } else {
-            [self generateNow];
-        }
+        [self loadSettings];   // v1.0.201：App 挂起恢复时 viewDidLoad 不会重跑，先刷新磁盘设置
+        [self generateNow];
     }
     completionHandler(UNNotificationPresentationOptionNone);
 }
 - (void)userNotificationCenter:(UNUserNotificationCenter *)center didReceiveNotificationResponse:(UNNotificationResponse *)response withCompletionHandler:(void(^)(void))completionHandler {
     if ([response.notification.request.identifier isEqualToString:@"UCSDailyGen"]) {
         [self loadSettings];
-        NSString *last = [NSString stringWithContentsOfFile:@"/var/mobile/Containers/Shared/AppGroup/.jbroot-C149CB1AB24ACB6A/var/mobile/Documents/hb_lastgen.txt" encoding:NSUTF8StringEncoding error:nil];
-        last = [last stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
-        if ([last isEqualToString:HBTodayString()]) {
-            HBLog(@"[UCS] didReceive: already generated today, skip");
-        } else {
-            [self generateNow];
-        }
+        [self generateNow];
     }
     completionHandler();
 }
@@ -1127,7 +1112,6 @@ static const NSTimeInterval kBatchIntervalSeconds = 60;  // 每批时间窗口 6
                                                      resultsHandler:^(HKSampleQuery *q, NSArray *results, NSError *e) {
         __strong typeof(weakSelf) strongSelf = weakSelf;
         if (!strongSelf) return;
-        __strong HKSourceRevision *strongDeviceRev = deviceRev;
         NSMutableArray *syntheticSamples = [NSMutableArray array];
         NSMutableSet<NSNumber *> *occupiedMinute = [NSMutableSet set];
         for (HKSample *s in (results ?: @[])) {
@@ -1188,12 +1172,7 @@ static const NSTimeInterval kBatchIntervalSeconds = 60;  // 每批时间窗口 6
             NSDate *batchStart = [startOfDay dateByAddingTimeInterval:(NSTimeInterval)(chosenMin * 60)];
             NSDate *batchEnd = [batchStart dateByAddingTimeInterval:kBatchIntervalSeconds];
 
-            HKQuantitySample *sample = [HKQuantitySample quantitySampleWithType:stepType
-                                                                  quantity:qty
-                                                               startDate:batchStart
-                                                                 endDate:batchEnd
-                                                                   device:[HKDevice localDevice]
-                                                                 metadata:@{HBSyntheticStepMetaKey: @YES}];
+            HKQuantitySample *sample = HBMakeDeviceSample(stepType, qty, batchStart, batchEnd, deviceRev);
 
             [strongSelf2 saveSamplePrivately:sample completion:^(BOOL ok, NSError *e){
                 __strong typeof(weakSelf) strongSelf3 = weakSelf;
@@ -1271,9 +1250,11 @@ static const NSTimeInterval kBatchIntervalSeconds = 60;  // 每批时间窗口 6
             [self _writeSteps:steps dist:distM flights:flights deviceRev:deviceRev index:index + 1];
         } else {
             HBLog(@"[UCS] all writes complete");
-            // v4.4.32: writeVirtualStepSample is async; it calls finishWithError when done.
-            // Don't call finishSuccess/verify here - that would VERIFY before virtual samples are written.
             [self writeVirtualStepSample:steps deviceRev:deviceRev];
+            dispatch_async(dispatch_get_main_queue(), ^{
+                [self finishSuccess:deviceRev];
+                [self verifyStepsWritten];
+            });
         }
     }];
 }
@@ -1363,7 +1344,7 @@ static void HBLaunchWeChat(void) {
 
 - (void)finishSuccess:(HKSourceRevision *)deviceRev {
     self.busy = NO;
-    [HBTodayString() writeToFile:@"/var/mobile/Containers/Shared/AppGroup/.jbroot-C149CB1AB24ACB6A/var/mobile/Documents/hb_lastgen.txt" atomically:YES encoding:NSUTF8StringEncoding error:nil];
+    [HBTodayString() writeToFile:HBLastGenPath() atomically:YES encoding:NSUTF8StringEncoding error:nil];
     [HBTodayString() writeToFile:@"/var/mobile/Documents/hb_lastgen.txt" atomically:YES encoding:NSUTF8StringEncoding error:nil];
     [self updateStatus:@"运动数据已生成，正在重启微信以刷新步数…"];
     HBKillWeChat();
