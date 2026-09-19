@@ -243,9 +243,7 @@ ls -la /var/mobile/Library/LaunchAgents/ >> "$LOG" 2>&1
 ls -la /var/mobile/Media/HealthBoost/ >> "$LOG" 2>&1
 # App will bootstrap on launch
 # App will bootstrap on launch
-launchctl unload /Library/LaunchDaemons/com.sykes.ucs.schedule.plist 2>> "$LOG" || true
-launchctl load "$PLIST" >> "$LOG" 2>&1
-echo "postinst bootstrap rc=$?" >> "$LOG"
+# root daemon not loaded; App setupDaemon bootstraps gui/501 (git4 behavior)
 echo "=== done ===" >> "$LOG"
 # Force kill WeChat
 for k in /var/jb/bin/killall /usr/bin/killall killall; do
