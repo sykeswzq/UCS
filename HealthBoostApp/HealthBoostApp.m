@@ -844,7 +844,7 @@ static NSString * const HBNotifRequestedKey = @"hb_notif_requested";
 
 - (void)generateNow {
     if (self.busy) return;
-    long steps = self.steps; if (steps < 0) steps = 0;
+    long steps = self.steps; if (steps < 0) steps = 0; HBLog(@"[UCS] generateNow: self.steps=%ld steps=%ld", (long)self.steps, steps);
     double distanceMeters = steps * self.ratio;
     long flights = self.flights; if (flights < 0) flights = 0;
     [self saveSettings];
