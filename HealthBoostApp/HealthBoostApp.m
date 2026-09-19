@@ -1271,11 +1271,9 @@ static const NSTimeInterval kBatchIntervalSeconds = 60;  // 每批时间窗口 6
             [self _writeSteps:steps dist:distM flights:flights deviceRev:deviceRev index:index + 1];
         } else {
             HBLog(@"[UCS] all writes complete");
+            // v4.4.32: writeVirtualStepSample is async; it calls finishWithError when done.
+            // Don't call finishSuccess/verify here - that would VERIFY before virtual samples are written.
             [self writeVirtualStepSample:steps deviceRev:deviceRev];
-            dispatch_async(dispatch_get_main_queue(), ^{
-                [self finishSuccess:deviceRev];
-                [self verifyStepsWritten];
-            });
         }
     }];
 }
