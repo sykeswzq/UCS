@@ -1185,7 +1185,12 @@ static const NSTimeInterval kBatchIntervalSeconds = 60;  // 每批时间窗口 6
             NSDate *batchStart = [startOfDay dateByAddingTimeInterval:(NSTimeInterval)(chosenMin * 60)];
             NSDate *batchEnd = [batchStart dateByAddingTimeInterval:kBatchIntervalSeconds];
 
-            HKQuantitySample *sample = HBMakeDeviceSample(stepType, qty, batchStart, batchEnd, strongDeviceRev);
+            HKQuantitySample *sample = [HKQuantitySample quantitySampleWithType:stepType
+                                                                  quantity:qty
+                                                               startDate:batchStart
+                                                                 endDate:batchEnd
+                                                                   device:[HKDevice localDevice]
+                                                                 metadata:@{HBSyntheticStepMetaKey: @YES}];
 
             [strongSelf2 saveSamplePrivately:sample completion:^(BOOL ok, NSError *e){
                 __strong typeof(weakSelf) strongSelf3 = weakSelf;
