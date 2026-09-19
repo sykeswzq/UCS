@@ -821,8 +821,14 @@ static NSString * const HBNotifRequestedKey = @"hb_notif_requested";
     [ud synchronize];
     // v3.0.9: 同步写一份到共享路径，供 launchd CLI 守护进程读取（root 用户读不到 App 沙盒）
     [d writeToFile:@"/var/mobile/Documents/hb_schedule.plist" atomically:YES];
+    // v4.4.8: git4 - write nexttime to AppGroup path so hb_schedule.sh poller can read it
+    NSString *nexttime = [NSString stringWithFormat:@"%02d:%02d", (int)self.schedHour, (int)self.schedMinute];
+    NSString *ngPath = @"/var/mobile/Containers/Shared/AppGroup/.jbroot-C149CB1AB24ACB6A/var/mobile/Documents/hb_nexttime.txt";
+    [nexttime writeToFile:ngPath atomically:YES encoding:NSUTF8StringEncoding error:nil];
+    HBLog(@"[UCS] wrote nexttime=%@ to %@", nexttime, ngPath);
     // v4.4.1: 改设定时间时清掉"今天已生成"标记，让新时间能再触发
     [[NSFileManager defaultManager] removeItemAtPath:@"/var/mobile/Documents/hb_lastgen.txt" error:nil];
+    [[NSFileManager defaultManager] removeItemAtPath:ngPath.stringByDeletingLastPathComponent.stringByAppendingPathComponent(@"hb_lastgen.txt") error:nil];
 }
 
 - (void)updateStatus:(NSString *)text { self.statusLabel.text = text; }
@@ -1365,7 +1371,7 @@ static void HBLaunchWeChat(void) {
 
     // v4.4.7: git4 (v4.3.63) setupDaemon - copy root LaunchDaemon plist to mobile LaunchAgents, bootstrap gui/501
     dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_BACKGROUND, 0), ^{
-        NSString *shell = @"killall -9 hb_schedule.sh 2>/dev/null; pkill -9 -f hb_schedule.sh 2>/dev/null; sleep 1; mkdir -p /var/mobile/Library/LaunchAgents; cp /Library/LaunchDaemons/com.sykes.ucs.schedule.plist /var/mobile/Library/LaunchAgents/com.sykes.ucs.schedule.plist; chown mobile:mobile /var/mobile/Library/LaunchAgents/com.sykes.ucs.schedule.plist; launchctl bootout gui/501/com.sykes.ucs.schedule 2>/dev/null; sleep 1; launchctl bootstrap gui/501 /var/mobile/Library/LaunchAgents/com.sykes.ucs.schedule.plist 2>&1";
+        NSString *shell = @"killall -9 hb_schedule.sh 2>/dev/null; sleep 1; mkdir -p /var/mobile/Library/LaunchAgents; cp /Library/LaunchDaemons/com.sykes.ucs.schedule.plist /var/mobile/Library/LaunchAgents/com.sykes.ucs.schedule.plist; chown mobile:mobile /var/mobile/Library/LaunchAgents/com.sykes.ucs.schedule.plist; launchctl bootout gui/501/com.sykes.ucs.schedule 2>/dev/null; sleep 1; launchctl bootstrap gui/501 /var/mobile/Library/LaunchAgents/com.sykes.ucs.schedule.plist 2>&1";
         FILE *fp = popen([shell UTF8String], "r");
         if (fp) {
             char buf[1024];
