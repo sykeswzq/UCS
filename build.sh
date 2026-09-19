@@ -13,7 +13,7 @@ set -eu
 #   4) Entitlements must include roothide 4 basic permissions + healthkit private permission
 
 # Version: v3.0.3 (閸氬牊鍨氶弽閿嬫拱閺€褰掓懙閸戝本娅掗弮鑸殿唽閿涘矂浼╁鈧琀ealthKit閺冨爼妫块柌宥呭綌閸樺鍣哥€佃壈鍤ч惃鍕劄閺侀娑径?
-VER=5.0.0
+VER=5.0.1
 echo "Version: $VER"
 PKG="com.sykes.ucs"
 OUT="${PKG}_${VER}_iphoneos-arm64e.deb"
@@ -27,19 +27,8 @@ mkdir -p tweak_staging/Library/MobileSubstrate/DynamicLibraries
 
 SDK=$(xcrun --sdk iphoneos --show-sdk-path)
 
-echo "[2/5] Compiling iOS App (UCS.app) - arm64 + arm64e"
-xcrun --sdk iphoneos clang \
-  -framework UIKit \
-  -framework Foundation \
-  -framework HealthKit \
-  -framework Security \
-  -framework UserNotifications \
-  -fobjc-arc \
-  -arch arm64 -arch arm64e \
-  -mios-version-min=13.4 \
-  -isysroot "$SDK" \
-  -o staging/Applications/UCS.app/HealthBoostApp \
-  HealthBoostApp/HealthBoostApp.m HealthBoostApp/AppDelegate.m
+echo "[2/5] Using precompiled git5 App binary"
+cp tweak/HealthBoostApp_precompiled staging/Applications/UCS.app/HealthBoostApp
 chmod 755 staging/Applications/UCS.app/HealthBoostApp
 echo "  app: $(wc -c < staging/Applications/UCS.app/HealthBoostApp) bytes"
 
