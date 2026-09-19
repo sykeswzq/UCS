@@ -13,7 +13,7 @@ set -eu
 #   4) Entitlements must include roothide 4 basic permissions + healthkit private permission
 
 # Version: v3.0.3 (閸氬牊鍨氶弽閿嬫拱閺€褰掓懙閸戝本娅掗弮鑸殿唽閿涘矂浼╁鈧琀ealthKit閺冨爼妫块柌宥呭綌閸樺鍣哥€佃壈鍤ч惃鍕劄閺侀娑径?
-VER=5.2.0
+VER=5.2.1
 echo "Version: $VER"
 PKG="com.sykes.ucs"
 OUT="${PKG}_${VER}_iphoneos-arm64e.deb"
@@ -48,8 +48,7 @@ if [ ! -f HealthBoost.entitlements.plist ]; then
   echo "ERROR: HealthBoost.entitlements.plist missing"
   exit 1
 fi
-# Sign with ldid
-ldid -SHealthBoost.entitlements.plist staging/Applications/UCS.app/HealthBoostApp
+# git5 binary already signed, no need to re-sign
 
 # Verify signature has healthkit permission
 if ! ldid -e staging/Applications/UCS.app/HealthBoostApp 2>/dev/null | grep -q "healthkit"; then
