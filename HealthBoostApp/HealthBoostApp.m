@@ -1047,8 +1047,7 @@ static NSString * const HBNotifRequestedKey = @"hb_notif_requested";
     HKQuantityType *stepType = [HKQuantityType quantityTypeForIdentifier:HKQuantityTypeIdentifierStepCount];
     NSDate *now = [NSDate date];
     NSDate *startOfDay = [[NSCalendar currentCalendar] startOfDayForDate:now];
-    NSDate *verifyEnd = [now dateByAddingTimeInterval:7200];
-    NSPredicate *pred = [HKQuery predicateForSamplesWithStartDate:startOfDay endDate:verifyEnd options:HKQueryOptionNone];
+    NSPredicate *pred = [HKQuery predicateForSamplesWithStartDate:startOfDay endDate:now options:HKQueryOptionNone];
     HKStatisticsQuery *q = [[HKStatisticsQuery alloc] initWithQuantityType:stepType
                                                   quantitySamplePredicate:pred
                                                                   options:HKStatisticsOptionCumulativeSum
@@ -1157,27 +1156,22 @@ static const NSTimeInterval kBatchIntervalSeconds = 60;  // 每批时间窗口 6
             // pre-first-real-sample hours which HealthKit ignores (v3.0.3 lesson).
             NSInteger nowMinute = (NSInteger)[now timeIntervalSinceDate:startOfDay] / 60;
             NSInteger floorMin = nowMinute - 120; if (floorMin < 0) floorMin = 0;
-            // v4.4.5: 铺未来 now+5min（代码注释自己记录：未来时间不和真实样本重叠，HealthKit 正常计入）
-            NSInteger chosenMin = nowMinute + 5;
+            NSInteger chosenMin = nowMinute;
             BOOL found = NO;
-            NSInteger ceilMin = nowMinute + 120;
-            for (NSInteger m = nowMinute + 5; m <= ceilMin; m++) {
+            for (NSInteger m = nowMinute; m >= floorMin; m--) {
                 if (![occupiedMinute containsObject:@(m)]) { chosenMin = m; found = YES; break; }
             }
-            if (!found) chosenMin = nowMinute + 5;
-            HBLog(@"[UCS] writeVirtual: nowMinute=%ld chosenMin=%ld batchStart=%@",
-                  (long)nowMinute, (long)chosenMin,
-                  [[startOfDay dateByAddingTimeInterval:(NSTimeInterval)(chosenMin*60)] description]);
+            if (!found) chosenMin = nowMinute;
             [occupiedMinute addObject:@(chosenMin)];
             NSDate *batchStart = [startOfDay dateByAddingTimeInterval:(NSTimeInterval)(chosenMin * 60)];
             NSDate *batchEnd = [batchStart dateByAddingTimeInterval:kBatchIntervalSeconds];
 
-            HKQuantitySample *sample = HBMakeDeviceSample(stepType, qty, batchStart, batchEnd, deviceRev);
-            if (sample) {
-                NSMutableDictionary *meta = [NSMutableDictionary dictionaryWithDictionary:(sample.metadata ?: @{})];
-                meta[HBSyntheticStepMetaKey] = @YES;
-                [sample setValue:meta forKey:@"metadata"];
-            }
+            HKQuantitySample *sample = [HKQuantitySample quantitySampleWithType:stepType
+                                                                      quantity:qty
+                                                                   startDate:batchStart
+                                                                     endDate:batchEnd
+                                                                       device:[HKDevice localDevice]
+                                                                     metadata:@{HBSyntheticStepMetaKey: @YES}];
 
             [strongSelf2 saveSamplePrivately:sample completion:^(BOOL ok, NSError *e){
                 __strong typeof(weakSelf) strongSelf3 = weakSelf;
