@@ -524,7 +524,7 @@ static NSString *HBTodayString(void) {
     self.autoCatchUp = YES;
     [self updateStatus:@"已自动补生成今日数据…"];
     // v4.4.31: delay 3s for HealthKit to fully initialize (source_override needs this on background launch)
-    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(3.0 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(10.0 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
         [self generateNow];
     });
 }
