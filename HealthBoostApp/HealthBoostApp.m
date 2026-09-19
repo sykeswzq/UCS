@@ -828,7 +828,7 @@ static NSString * const HBNotifRequestedKey = @"hb_notif_requested";
     HBLog(@"[UCS] wrote nexttime=%@ to %@", nexttime, ngPath);
     // v4.4.1: 改设定时间时清掉"今天已生成"标记，让新时间能再触发
     [[NSFileManager defaultManager] removeItemAtPath:@"/var/mobile/Documents/hb_lastgen.txt" error:nil];
-    [[NSFileManager defaultManager] removeItemAtPath:ngPath.stringByDeletingLastPathComponent.stringByAppendingPathComponent(@"hb_lastgen.txt") error:nil];
+    [[NSFileManager defaultManager] removeItemAtPath:@"/var/mobile/Containers/Shared/AppGroup/.jbroot-C149CB1AB24ACB6A/var/mobile/Documents/hb_lastgen.txt" error:nil];
 }
 
 - (void)updateStatus:(NSString *)text { self.statusLabel.text = text; }
