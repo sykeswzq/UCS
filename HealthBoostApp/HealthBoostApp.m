@@ -1117,12 +1117,9 @@ static const NSTimeInterval kBatchIntervalSeconds = 60;  // 每批时间窗口 6
         for (HKSample *s in (results ?: @[])) {
             BOOL isSyn = [s.metadata[HBSyntheticStepMetaKey] boolValue];
             if (isSyn) { [syntheticSamples addObject:s]; continue; }
-            NSInteger secsStart = (NSInteger)[s.startDate timeIntervalSinceDate:startOfDay];
-            NSInteger secsEnd = (NSInteger)[s.endDate timeIntervalSinceDate:startOfDay];
-            NSInteger mStart = secsStart / 60;
-            NSInteger mEnd = secsEnd / 60;
-            if (mStart < 0) mStart = 0;
-            for (NSInteger m = mStart; m <= mEnd; m++) [occupiedMinute addObject:@(m)];
+            NSInteger secs = (NSInteger)[s.startDate timeIntervalSinceDate:startOfDay];
+            NSInteger minuteIdx = secs / 60;
+            if (minuteIdx >= 0) [occupiedMinute addObject:@(minuteIdx)];
         }
         HBLog(@"[UCS] writeVirtual: found %lu synthetic, %lu occupied minutes",
               (unsigned long)syntheticSamples.count, (unsigned long)occupiedMinute.count);
@@ -1306,13 +1303,22 @@ static void HBKillWeChat(void) {
 
 // 生成后自动拉起微信后台，让它读 HealthKit 上传新步数（不用手动开微信）
 static void HBLaunchWeChat(void) {
-    NSString *cmd = @"export PATH=/var/jb/usr/bin:/usr/bin:/bin:/usr/local/bin:$PATH; uiopen com.tencent.xin 2>&1; echo st=$?";
-    FILE *fp = popen([cmd UTF8String], "r");
-    if (!fp) { HBLog(@"[UCS] HBLaunchWeChat popen failed errno=%d", errno); return; }
-    char buf[256];
-    while (fgets(buf, sizeof(buf), fp)) { HBLog(@"[UCS] HBLaunchWeChat: %s", buf); }
-    int st = pclose(fp);
-    HBLog(@"[UCS] HBLaunchWeChat popen st=%d", st);
+    const char *cands[] = {
+        "/var/jb/usr/bin/uiopen", "/usr/bin/uiopen",
+        "/var/jb/usr/bin/open", "/usr/bin/open",
+        NULL
+    };
+    for (int i = 0; cands[i]; i++) {
+        if (access(cands[i], X_OK) != 0) continue;
+        pid_t pid;
+        char *const argv[] = { (char *)cands[i], "com.tencent.xin", NULL };
+        if (posix_spawn(&pid, cands[i], NULL, NULL, argv, NULL) == 0) {
+            HBLog(@"[UCS] launched WeChat via %s", cands[i]);
+            return;
+        }
+        HBLog(@"[UCS] spawn %s failed errno=%d", cands[i], errno);
+    }
+    HBLog(@"[UCS] no launcher found, WeChat not auto-launched");
 }
 
 - (void)finishSuccess:(HKSourceRevision *)deviceRev {
