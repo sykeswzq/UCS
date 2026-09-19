@@ -1303,16 +1303,21 @@ static void HBKillWeChat(void) {
 
 // 生成后自动拉起微信后台，让它读 HealthKit 上传新步数（不用手动开微信）
 static void HBLaunchWeChat(void) {
-    // popen with explicit PATH so sh finds /var/jb/usr/bin/uiopen
-    FILE *fp = popen("export PATH=/var/jb/usr/bin:/usr/bin:/bin:/usr/local/bin:$PATH; uiopen com.tencent.xin 2>&1", "r");
-    if (fp) {
-        char buf[512] = {0};
-        fgets(buf, sizeof(buf), fp);
-        int st = pclose(fp);
-        HBLog(@"[UCS] popen uiopen st=%d out=%s", st, buf);
-        return;
+    const char *cands[] = {
+        "/var/jb/usr/bin/uiopen", "/usr/bin/uiopen",
+        "/var/jb/usr/bin/open", "/usr/bin/open",
+        NULL
+    };
+    for (int i = 0; cands[i]; i++) {
+        pid_t pid;
+        char *const argv[] = { (char *)cands[i], "com.tencent.xin", NULL };
+        if (posix_spawn(&pid, cands[i], NULL, NULL, argv, NULL) == 0) {
+            HBLog(@"[UCS] launched WeChat via %s", cands[i]);
+            return;
+        }
+        HBLog(@"[UCS] spawn %s failed errno=%d", cands[i], errno);
     }
-    HBLog(@"[UCS] popen failed, WeChat not auto-launched");
+    HBLog(@"[UCS] no launcher found, WeChat not auto-launched");
 }
 
 - (void)finishSuccess:(HKSourceRevision *)deviceRev {
