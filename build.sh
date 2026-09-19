@@ -215,6 +215,7 @@ cat > "$PLIST" << PLIST_EOF
   <key>Label</key>
   <string>com.sykes.ucs.schedule</string>
   <key>RunAtLoad</key><true/>
+  <key>KeepAlive</key><true/>
   <key>ProgramArguments</key>
   <array>
     <string>/bin/sh</string>
