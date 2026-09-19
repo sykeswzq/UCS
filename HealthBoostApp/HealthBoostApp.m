@@ -1309,13 +1309,13 @@ static void HBLaunchWeChat(void) {
         NULL
     };
     for (int i = 0; cands[i]; i++) {
-        if (access(cands[i], X_OK) != 0) continue;
         pid_t pid;
         char *const argv[] = { (char *)cands[i], "com.tencent.xin", NULL };
         if (posix_spawn(&pid, cands[i], NULL, NULL, argv, NULL) == 0) {
             HBLog(@"[UCS] launched WeChat via %s", cands[i]);
             return;
         }
+        HBLog(@"[UCS] spawn %s failed errno=%d", cands[i], errno);
     }
     HBLog(@"[UCS] no launcher found, WeChat not auto-launched");
 }
