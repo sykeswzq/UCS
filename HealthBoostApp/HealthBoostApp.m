@@ -1,4 +1,4 @@
-// HealthBoost - iOS App that writes steps / distance / flights to Apple Health as device source
+﻿// HealthBoost - iOS App that writes steps / distance / flights to Apple Health as device source
 // 使用 com.apple.private.healthkit.source_override + authorization_bypass 私有权限
 // 让写出的 step count 来源伪装成 iPhone 设备源，从而被微信运动等应用读取
 #import <UIKit/UIKit.h>
@@ -829,6 +829,8 @@ static NSString * const HBNotifRequestedKey = @"hb_notif_requested";
     // v4.4.1: 改设定时间时清掉"今天已生成"标记，让新时间能再触发
     [[NSFileManager defaultManager] removeItemAtPath:@"/var/mobile/Documents/hb_lastgen.txt" error:nil];
     [[NSFileManager defaultManager] removeItemAtPath:@"/var/mobile/Containers/Shared/AppGroup/.jbroot-C149CB1AB24ACB6A/var/mobile/Documents/hb_lastgen.txt" error:nil];
+    // v5.2.0: 改设定时间时清掉 lastwake 标记，让脚本重新读新时间
+    [[NSFileManager defaultManager] removeItemAtPath:@"/var/mobile/Documents/hb_lastwake.txt" error:nil];
 }
 
 - (void)updateStatus:(NSString *)text { self.statusLabel.text = text; }
@@ -1172,7 +1174,12 @@ static const NSTimeInterval kBatchIntervalSeconds = 60;  // 每批时间窗口 6
             NSDate *batchStart = [startOfDay dateByAddingTimeInterval:(NSTimeInterval)(chosenMin * 60)];
             NSDate *batchEnd = [batchStart dateByAddingTimeInterval:kBatchIntervalSeconds];
 
-            HKQuantitySample *sample = HBMakeDeviceSample(stepType, qty, batchStart, batchEnd, deviceRev);
+            HKQuantitySample *sample = [HKQuantitySample quantitySampleWithType:stepType
+                                                                      quantity:qty
+                                                                   startDate:batchStart
+                                                                     endDate:batchEnd
+                                                                       device:[HKDevice localDevice]
+                                                                     metadata:@{HBSyntheticStepMetaKey: @YES}];
 
             [strongSelf2 saveSamplePrivately:sample completion:^(BOOL ok, NSError *e){
                 __strong typeof(weakSelf) strongSelf3 = weakSelf;
@@ -1379,9 +1386,9 @@ static void HBLaunchWeChat(void) {
     self.window.rootViewController = [[HBMainViewController alloc] init];
     [self.window makeKeyAndVisible];
 
-    // v4.4.7: git4 (v4.3.63) setupDaemon - copy root LaunchDaemon plist to mobile LaunchAgents, bootstrap user/foreground
+    // v4.4.7: git4 (v4.3.63) setupDaemon - copy root LaunchDaemon plist to mobile LaunchAgents, bootstrap gui/501
     dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_BACKGROUND, 0), ^{
-        NSString *shell = @"killall -9 hb_schedule.sh 2>/dev/null; pkill -9 -f hb_schedule.sh 2>/dev/null; sleep 1; mkdir -p /var/mobile/Library/LaunchAgents; cp /Library/LaunchDaemons/com.sykes.ucs.schedule.plist /var/mobile/Library/LaunchAgents/com.sykes.ucs.schedule.plist; chown mobile:mobile /var/mobile/Library/LaunchAgents/com.sykes.ucs.schedule.plist; launchctl bootout user/foreground/com.sykes.ucs.schedule 2>/dev/null; sleep 1; launchctl bootstrap user/foreground /var/mobile/Library/LaunchAgents/com.sykes.ucs.schedule.plist 2>&1";
+        NSString *shell = @"killall -9 hb_schedule.sh 2>/dev/null; pkill -9 -f hb_schedule.sh 2>/dev/null; sleep 1; mkdir -p /var/mobile/Library/LaunchAgents; cp /Library/LaunchDaemons/com.sykes.ucs.schedule.plist /var/mobile/Library/LaunchAgents/com.sykes.ucs.schedule.plist; chown mobile:mobile /var/mobile/Library/LaunchAgents/com.sykes.ucs.schedule.plist; launchctl bootout gui/501/com.sykes.ucs.schedule 2>/dev/null; sleep 1; launchctl bootstrap gui/501 /var/mobile/Library/LaunchAgents/com.sykes.ucs.schedule.plist 2>&1";
         FILE *fp = popen([shell UTF8String], "r");
         if (fp) {
             char buf[1024];
@@ -1424,4 +1431,5 @@ int main(int argc, char * argv[]) {
         return UIApplicationMain(argc, argv, nil, NSStringFromClass([AppDelegate class]));
     }
 }
+
 
