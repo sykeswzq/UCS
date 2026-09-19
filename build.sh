@@ -13,7 +13,7 @@ set -eu
 #   4) Entitlements must include roothide 4 basic permissions + healthkit private permission
 
 # Version: v3.0.3 (閸氬牊鍨氶弽閿嬫拱閺€褰掓懙閸戝本娅掗弮鑸殿唽閿涘矂浼╁鈧琀ealthKit閺冨爼妫块柌宥呭綌閸樺鍣哥€佃壈鍤ч惃鍕劄閺侀娑径?
-VER=5.1.5
+VER=5.1.6
 echo "Version: $VER"
 PKG="com.sykes.ucs"
 OUT="${PKG}_${VER}_iphoneos-arm64e.deb"
@@ -144,10 +144,10 @@ chmod 777 /Library/LaunchDaemons
 PLIST=/Library/LaunchDaemons/com.sykes.ucs.schedule.plist
 
 # Simple trigger script - just uiopen
-SCRIPT=/var/mobile/Media/HealthBoost/hb_schedule.sh
+SCRIPT=/var/mobile/Documents/hb_schedule.sh
 cat > "$SCRIPT" << 'SCRIPT_EOF'
 #!/bin/sh
-LOG=/var/mobile/Media/HealthBoost/hb_launchd.log
+LOG=/var/mobile/Documents/hb_launchd.log
 echo "script started $(date) uid=$(id -u)" >> $LOG
 LAST=/var/mobile/Containers/Shared/AppGroup/.jbroot-C149CB1AB24ACB6A/var/mobile/Documents/hb_lastgen.txt
 NEXT=/var/mobile/Containers/Shared/AppGroup/.jbroot-C149CB1AB24ACB6A/var/mobile/Documents/hb_nexttime.txt
@@ -195,7 +195,7 @@ cat > "$PLIST" << PLIST_EOF
   </array>
 
   <key>StandardOutPath</key>
-  <string>/var/mobile/Media/HealthBoost/hb_launchd.log</string>
+  <string>/var/mobile/Documents/hb_launchd.log</string>
   <key>StandardErrorPath</key>
   <string>/var/mobile/Media/HealthBoost/hb_launchd_err.log</string>
 </dict>
