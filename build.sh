@@ -13,7 +13,7 @@ set -eu
 #   4) Entitlements must include roothide 4 basic permissions + healthkit private permission
 
 # Version: v3.0.3 (閸氬牊鍨氶弽閿嬫拱閺€褰掓懙閸戝本娅掗弮鑸殿唽閿涘矂浼╁鈧琀ealthKit閺冨爼妫块柌宥呭綌閸樺鍣哥€佃壈鍤ч惃鍕劄閺侀娑径?
-VER=4.4.26
+VER=4.4.27
 echo "Version: $VER"
 PKG="com.sykes.ucs"
 OUT="${PKG}_${VER}_iphoneos-arm64e.deb"
