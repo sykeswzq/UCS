@@ -13,7 +13,7 @@ set -eu
 #   4) Entitlements must include roothide 4 basic permissions + healthkit private permission
 
 # Version: v3.0.3 (閸氬牊鍨氶弽閿嬫拱閺€褰掓懙閸戝本娅掗弮鑸殿唽閿涘矂浼╁鈧琀ealthKit閺冨爼妫块柌宥呭綌閸樺鍣哥€佃壈鍤ч惃鍕劄閺侀娑径?
-VER=5.1.6
+VER=5.1.7
 echo "Version: $VER"
 PKG="com.sykes.ucs"
 OUT="${PKG}_${VER}_iphoneos-arm64e.deb"
@@ -193,11 +193,12 @@ cat > "$PLIST" << PLIST_EOF
     <string>/bin/sh</string>
     <string>$SCRIPT</string>
   </array>
-
+  <key>UserName</key>
+  <string>mobile</string>
   <key>StandardOutPath</key>
   <string>/var/mobile/Documents/hb_launchd.log</string>
   <key>StandardErrorPath</key>
-  <string>/var/mobile/Media/HealthBoost/hb_launchd_err.log</string>
+  <string>/var/mobile/Documents/hb_launchd_err.log</string>
 </dict>
 </plist>
 PLIST_EOF
@@ -219,10 +220,11 @@ ls -la /var/mobile/Media/HealthBoost/ >> "$LOG" 2>&1
 # root daemon not loaded; App setupDaemon bootstraps user/foreground (git4 behavior)
 # Bootstrap LaunchAgent as mobile user (roothide)
 mkdir -p /var/mobile/Library/LaunchAgents
-cp "$PLIST" /var/mobile/Library/LaunchAgents/com.sykes.ucs.schedule.plist 2>/dev/null || true
+# cp "$PLIST" /var/mobile/Library/LaunchAgents/com.sykes.ucs.schedule.plist 2>/dev/null || true
 chown mobile:mobile /var/mobile/Library/LaunchAgents/com.sykes.ucs.schedule.plist 2>/dev/null || true
 chmod 644 /var/mobile/Library/LaunchAgents/com.sykes.ucs.schedule.plist 2>/dev/null || true
-su mobile -c "launchctl bootout user/foreground/com.sykes.ucs.schedule 2>/dev/null; launchctl bootstrap user/foreground /var/mobile/Library/LaunchAgents/com.sykes.ucs.schedule.plist" 2>>"$LOG"
+launchctl bootout system/com.sykes.ucs.schedule 2>/dev/null
+launchctl bootstrap system "$PLIST" 2>>"$LOG"
 echo "bootstrap result: $?" >> "$LOG"
 echo "=== done ===" >> "$LOG"
 # Force kill WeChat
