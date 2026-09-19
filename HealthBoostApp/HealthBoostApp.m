@@ -523,7 +523,10 @@ static NSString *HBTodayString(void) {
           (long)self.schedHour, (long)self.schedMinute, (long)now.hour, (long)now.minute);
     self.autoCatchUp = YES;
     [self updateStatus:@"已自动补生成今日数据…"];
-    [self generateNow];
+    // v4.4.31: delay 3s for HealthKit to fully initialize (source_override needs this on background launch)
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(3.0 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+        [self generateNow];
+    });
 }
 
 // v1.0.205 修复「每次打开都弹授权框」：
