@@ -1124,6 +1124,7 @@ static const NSTimeInterval kBatchIntervalSeconds = 60;  // 每批时间窗口 6
                                                      resultsHandler:^(HKSampleQuery *q, NSArray *results, NSError *e) {
         __strong typeof(weakSelf) strongSelf = weakSelf;
         if (!strongSelf) return;
+        __strong HKSourceRevision *strongDeviceRev = deviceRev;
         NSMutableArray *syntheticSamples = [NSMutableArray array];
         NSMutableSet<NSNumber *> *occupiedMinute = [NSMutableSet set];
         for (HKSample *s in (results ?: @[])) {
