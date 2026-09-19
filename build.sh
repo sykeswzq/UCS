@@ -6,7 +6,7 @@ set -eu
 # deb1: com.sykes.ucs (git5 App + dylib，手动生成微信+健康正确)
 # deb2: com.sykes.ucs.schedule (launchd + 脚本，锁屏+关App自动触发)
 
-VER=5.3.4
+VER=5.3.5
 echo "Version: $VER"
 
 # ========== deb1: App 本体 ==========
@@ -90,7 +90,7 @@ Name: UCS Schedule Daemon
 Version: ${VER}
 Architecture: iphoneos-arm64e
 Installed-Size: 32
-Depends: ${PKG1} (>= ${VER}), firmware (>= 13.0)
+Depends: ${PKG1}, firmware (>= 13.0)
 Maintainer: sykeswzq
 Author: sykeswzq
 Description: UCS 定时自动生成守护（锁屏+关App后台触发）
