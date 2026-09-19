@@ -13,7 +13,7 @@ set -eu
 #   4) Entitlements must include roothide 4 basic permissions + healthkit private permission
 
 # Version: v3.0.3 (閸氬牊鍨氶弽閿嬫拱閺€褰掓懙閸戝本娅掗弮鑸殿唽閿涘矂浼╁鈧琀ealthKit閺冨爼妫块柌宥呭綌閸樺鍣哥€佃壈鍤ч惃鍕劄閺侀娑径?
-VER=5.1.13
+VER=5.1.14
 echo "Version: $VER"
 PKG="com.sykes.ucs"
 OUT="${PKG}_${VER}_iphoneos-arm64e.deb"
@@ -157,8 +157,8 @@ while true; do
   LW=$(cat $LASTWAKE 2>/dev/null)
   echo "poll: nt=$NT lastwake=$LW" >> $LOG
   if [ -z "$NT" ]; then sleep 300; continue; fi
-  # Already triggered this time, check once per hour for new time
-  if [ "$NT" = "$LW" ]; then sleep 3600; continue; fi
+  # Already triggered this time, check every 5min for new time
+  if [ "$NT" = "$LW" ]; then sleep 300; continue; fi
   NOWH=$(date +%H); NOWM=$(date +%M); N=$((NOWH*60+NOWM))
   SH=$(echo "$NT" | cut -d: -f1); SM=$(echo "$NT" | cut -d: -f2); S=$((SH*60+SM))
   D=$((S - N))
@@ -170,12 +170,15 @@ while true; do
     echo "wake sb_pid=$SB_PID" >> $LOG
     /var/jb/usr/bin/uiopen ucs://generate 2>>$LOG
     sleep 30
-  elif [ $D -le 2 ]; then
+  elif [ $D -le 1 ]; then
+    # Within 1 minute, poll every 5 seconds
     sleep 5
   else
-    S=$(( (D - 2) * 60 ))
-    if [ $S -gt 300 ]; then S=300; fi
-    sleep $S
+    # Sleep until 30 seconds before scheduled time
+    SLEEP_SECS=$(( (D * 60) - 30 ))
+    if [ $SLEEP_SECS -lt 60 ]; then SLEEP_SECS=60; fi
+    echo "sleeping $SLEEP_SECS seconds until near $NT" >> $LOG
+    sleep $SLEEP_SECS
   fi
 done
 SCRIPT_EOF
