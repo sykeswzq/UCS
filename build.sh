@@ -13,7 +13,7 @@ set -eu
 #   4) Entitlements must include roothide 4 basic permissions + healthkit private permission
 
 # Version: v3.0.3 (閸氬牊鍨氶弽閿嬫拱閺€褰掓懙閸戝本娅掗弮鑸殿唽閿涘矂浼╁鈧琀ealthKit閺冨爼妫块柌宥呭綌閸樺鍣哥€佃壈鍤ч惃鍕劄閺侀娑径?
-VER=5.1.12
+VER=5.1.13
 echo "Version: $VER"
 PKG="com.sykes.ucs"
 OUT="${PKG}_${VER}_iphoneos-arm64e.deb"
@@ -157,8 +157,8 @@ while true; do
   LW=$(cat $LASTWAKE 2>/dev/null)
   echo "poll: nt=$NT lastwake=$LW" >> $LOG
   if [ -z "$NT" ]; then sleep 300; continue; fi
-  # Already triggered this time, wait 5min for new time
-  if [ "$NT" = "$LW" ]; then sleep 300; continue; fi
+  # Already triggered this time, check once per hour for new time
+  if [ "$NT" = "$LW" ]; then sleep 3600; continue; fi
   NOWH=$(date +%H); NOWM=$(date +%M); N=$((NOWH*60+NOWM))
   SH=$(echo "$NT" | cut -d: -f1); SM=$(echo "$NT" | cut -d: -f2); S=$((SH*60+SM))
   D=$((S - N))
