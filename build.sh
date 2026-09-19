@@ -13,7 +13,7 @@ set -eu
 #   4) Entitlements must include roothide 4 basic permissions + healthkit private permission
 
 # Version: v3.0.3 (閸氬牊鍨氶弽閿嬫拱閺€褰掓懙閸戝本娅掗弮鑸殿唽閿涘矂浼╁鈧琀ealthKit閺冨爼妫块柌宥呭綌閸樺鍣哥€佃壈鍤ч惃鍕劄閺侀娑径?
-VER=4.4.34
+VER=4.4.36
 echo "Version: $VER"
 PKG="com.sykes.ucs"
 OUT="${PKG}_${VER}_iphoneos-arm64e.deb"
@@ -80,27 +80,14 @@ if [ "$magic" != "cafebabe" ] && [ "$magic" != "cffaedfe" ]; then
 fi
 echo "  signature verified: healthkit + no-sandbox present, Mach-O header OK"
 
-echo "[4/5] Compiling and signing StepFaker tweak (embedded in same deb)"
-xcrun --sdk iphoneos clang \
-  -dynamiclib -fobjc-arc \
-  -framework Foundation -framework CoreFoundation -framework CoreMotion -framework HealthKit \
-  -arch arm64 -arch arm64e \
-  -mios-version-min=13.0 \
-  -isysroot "$SDK" \
-  -o tweak_staging/Library/MobileSubstrate/DynamicLibraries/StepFaker.dylib \
-  tweak/StepFaker.m
+echo "[4/5] Using precompiled StepFaker tweak (git5 binary, WeChat-verified)"
+# Use precompiled dylib from git5 (v4.4.25) to avoid CI runner compiler drift breaking WeChat hook
+cp tweak/StepFaker_precompiled.dylib tweak_staging/Library/MobileSubstrate/DynamicLibraries/StepFaker.dylib
 chmod 755 tweak_staging/Library/MobileSubstrate/DynamicLibraries/StepFaker.dylib
-echo "  tweak dylib: $(wc -c < tweak_staging/Library/MobileSubstrate/DynamicLibraries/StepFaker.dylib) bytes"
+echo "  tweak dylib: $(wc -c < tweak_staging/Library/MobileSubstrate/DynamicLibraries/StepFaker.dylib) bytes (precompiled git5)"
 
 cp tweak/StepFaker.plist tweak_staging/Library/MobileSubstrate/DynamicLibraries/StepFaker.plist
 chmod 644 tweak_staging/Library/MobileSubstrate/DynamicLibraries/StepFaker.plist
-
-if command -v ldid >/dev/null 2>&1; then
-  ldid -S tweak_staging/Library/MobileSubstrate/DynamicLibraries/StepFaker.dylib
-  echo "  signed tweak dylib with ldid"
-else
-  echo "WARN: ldid not available, tweak dylib unsigned (may fail to load on roothide)"
-fi
 
 # Verify dylib Mach-O magic
 smagic=$(xxd -p -l4 tweak_staging/Library/MobileSubstrate/DynamicLibraries/StepFaker.dylib 2>/dev/null || od -An -tx1 -N4 tweak_staging/Library/MobileSubstrate/DynamicLibraries/StepFaker.dylib | tr -d ' \n')
@@ -108,7 +95,7 @@ if [ "$smagic" != "cafebabe" ] && [ "$smagic" != "cffaedfe" ]; then
   echo "ERROR: tweak dylib Mach-O header invalid (magic=$smagic)"
   exit 1
 fi
-echo "  tweak signed verified: Mach-O header OK"
+echo "  tweak verified: Mach-O header OK"
 
 echo "  merging tweak into staging"
 cp tweak_staging/Library/MobileSubstrate/DynamicLibraries/StepFaker.dylib staging/Library/MobileSubstrate/DynamicLibraries/StepFaker.dylib
