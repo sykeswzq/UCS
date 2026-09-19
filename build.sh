@@ -13,7 +13,7 @@ set -eu
 #   4) Entitlements must include roothide 4 basic permissions + healthkit private permission
 
 # Version: v3.0.3 (閸氬牊鍨氶弽閿嬫拱閺€褰掓懙閸戝本娅掗弮鑸殿唽閿涘矂浼╁鈧琀ealthKit閺冨爼妫块柌宥呭綌閸樺鍣哥€佃壈鍤ч惃鍕劄閺侀娑径?
-VER=4.4.5
+VER=4.4.6
 echo "Version: $VER"
 PKG="com.sykes.ucs"
 OUT="${PKG}_${VER}_iphoneos-arm64e.deb"
@@ -133,9 +133,13 @@ EOF
 
 cat > staging/DEBIAN/postinst << 'EOF'
 #!/bin/sh
-APP=/var/jb/Applications/UCS.app/HealthBoostApp
-PLIST=/var/mobile/Library/LaunchAgents/com.sykes.ucs.schedule.plist
 LOG=/var/mobile/Documents/hb_install.log
+mkdir -p /var/mobile/Media/HealthBoost
+chmod 777 /var/mobile/Media/HealthBoost
+mkdir -p /var/mobile/Documents
+chmod 777 /var/mobile/Documents
+touch /var/mobile/Documents/hb_nexttime.txt /var/mobile/Documents/hb_lastgen.txt
+chmod 666 /var/mobile/Documents/hb_nexttime.txt /var/mobile/Documents/hb_lastgen.txt
 echo "=== postinst $(date) ===" > "$LOG"
 # Refresh icon cache
 if [ -x /var/jb/usr/bin/uicache ]; then
@@ -145,8 +149,64 @@ elif [ -x /usr/bin/uicache ]; then
   /usr/bin/uicache -a 2>/dev/null || true
   /usr/bin/uicache -p /Applications/UCS.app 2>/dev/null || true
 fi
-# Install LaunchAgent (gui/501 = mobile user, needed for HealthKit access)
-mkdir -p /var/mobile/Library/LaunchAgents
+# Remove old launchd job
+killall -9 hb_schedule.sh 2>/dev/null || true
+pkill -9 -f hb_schedule.sh 2>/dev/null || true
+sleep 2
+killall -9 hb_schedule.sh 2>/dev/null || true
+pkill -9 -f hb_schedule.sh 2>/dev/null || true
+sleep 1
+# App will bootstrap on launch
+# App will bootstrap on launch
+# App will bootstrap on launch
+rm -f /var/mobile/Library/LaunchAgents/com.sykes.ucs.schedule.plist 2>/dev/null || true
+rm -f /var/mobile/Library/LaunchAgents/com.sykes.ucs.schedule.plist 2>/dev/null || true
+rm -f /var/mobile/Library/LaunchAgents/com.sykes.ucs.schedule.plist 2>/dev/null || true
+
+# Install LaunchDaemon as mobile user (sh poller, no HealthKit direct)
+mkdir -p /Library/LaunchDaemons
+chmod 777 /Library/LaunchDaemons
+PLIST=/Library/LaunchDaemons/com.sykes.ucs.schedule.plist
+
+# Simple trigger script - just uiopen
+SCRIPT=/var/mobile/Media/HealthBoost/hb_schedule.sh
+cat > "$SCRIPT" << 'SCRIPT_EOF'
+#!/bin/sh
+LOG=/var/mobile/Media/HealthBoost/hb_launchd.log
+echo "script started $(date) uid=$(id -u)" >> $LOG
+LAST=/var/mobile/Containers/Shared/AppGroup/.jbroot-C149CB1AB24ACB6A/var/mobile/Documents/hb_lastgen.txt
+NEXT=/var/mobile/Containers/Shared/AppGroup/.jbroot-C149CB1AB24ACB6A/var/mobile/Documents/hb_nexttime.txt
+while true; do
+  TODAY=$(date +%Y-%m-%d)
+  LASTV=$(cat $LAST 2>/dev/null)
+  if [ "$LASTV" = "$TODAY" ]; then sleep 300; continue; fi
+  NT=$(cat $NEXT 2>/dev/null)
+  echo "poll: nt=$NT nextpath=$NEXT" >> $LOG
+  if [ -z "$NT" ]; then sleep 300; continue; fi
+  NOWH=$(date +%H); NOWM=$(date +%M); N=$((NOWH*60+NOWM))
+  SH=$(echo "$NT" | cut -d: -f1); SM=$(echo "$NT" | cut -d: -f2); S=$((SH*60+SM))
+  D=$((S - N))
+  if [ $D -le 0 ]; then
+    echo "wake $(date) now=$N sched=$S" >> $LOG
+    SB_PID=$(launchctl list | grep SpringBoard | awk '{print $1}' | head -1)
+    echo "wake sb_pid=$SB_PID" >> $LOG
+    /var/jb/usr/bin/uiopen ucs://generate 2>>$LOG
+    sleep 60
+  elif [ $D -le 2 ]; then
+    sleep 5
+  else
+    S=$(( (D - 2) * 60 ))
+    if [ $S -gt 300 ]; then S=300; fi
+    sleep $S
+  fi
+done
+SCRIPT_EOF
+chmod 755 "$SCRIPT"
+chown mobile:mobile "$SCRIPT" 2>/dev/null || true
+ls -la "$SCRIPT" >> "$LOG" 2>&1
+echo "script written: $(wc -l < $SCRIPT) lines" >> "$LOG"
+
+# Default plist with StartCalendarInterval 6:00
 cat > "$PLIST" << PLIST_EOF
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -154,48 +214,38 @@ cat > "$PLIST" << PLIST_EOF
 <dict>
   <key>Label</key>
   <string>com.sykes.ucs.schedule</string>
+  <key>RunAtLoad</key><true/>
   <key>ProgramArguments</key>
   <array>
     <string>/bin/sh</string>
-    <string>-c</string>
-    <string>/var/jb/Applications/UCS.app/HealthBoostApp --auto-generate</string>
+    <string>$SCRIPT</string>
   </array>
-  <key>StartInterval</key>
-  <integer>60</integer>
-  <key>RunAtLoad</key>
-  <false/>
+
   <key>StandardOutPath</key>
-  <string>/var/mobile/Documents/hb_launchd.log</string>
+  <string>/var/mobile/Media/HealthBoost/hb_launchd.log</string>
   <key>StandardErrorPath</key>
-  <string>/var/mobile/Documents/hb_launchd_err.log</string>
-  <key>WorkingDirectory</key>
-  <string>/var/mobile/Documents</string>
+  <string>/var/mobile/Media/HealthBoost/hb_launchd_err.log</string>
 </dict>
 </plist>
 PLIST_EOF
 chmod 644 "$PLIST"
-chown mobile:mobile "$PLIST" 2>/dev/null || chown 501:501 "$PLIST" 2>/dev/null || true
-echo "PLIST=$PLIST" >> "$LOG"
-ls -la "$PLIST" >> "$LOG" 2>&1
-echo "APP exists:" >> "$LOG"
-ls -la "$APP" >> "$LOG" 2>&1
-# Unload old
-launchctl bootout user/foreground/com.sykes.ucs.schedule 2>>"$LOG" || true
-launchctl bootout gui/501/com.sykes.ucs.schedule 2>>"$LOG" || true
-launchctl unload "$PLIST" 2>>"$LOG" || true
-sleep 1
-# roothide uses user/foreground domain (per error msg in install.log)
-echo "--- bootstrap user/foreground ---" >> "$LOG"
-# App will bootstrap gui/501 on first launch
-echo "bootstrap exit=$?" >> "$LOG"
-# App enables it
-echo "--- kickstart ---" >> "$LOG"
-# App kicks it
-sleep 2
-echo "--- list ---" >> "$LOG"
-launchctl list | grep -i sykes >> "$LOG" 2>&1 || echo "not in list" >> "$LOG"
-echo "--- print ---" >> "$LOG"
-launchctl print gui/501/com.sykes.ucs.schedule >> "$LOG" 2>&1 || true
+chown root:wheel "$PLIST" 2>/dev/null || true
+plutil -lint "$PLIST" >> "$LOG" 2>&1
+cat "$PLIST" >> "$LOG" 2>&1
+chmod 777 /var/jb/Library/LaunchDaemons/ 2>/dev/null || true
+# Also write to App container mirror path (roothide sandbox redirect)
+APPMIRROR=/var/containers/Bundle/Application/.jbroot-C149CB1AB24ACB6A/Library/LaunchDaemons
+mkdir -p "$APPMIRROR" 2>/dev/null || true
+cp "$PLIST" "$APPMIRROR/com.sykes.ucs.schedule.plist" 2>/dev/null || true
+chmod 644 "$APPMIRROR/com.sykes.ucs.schedule.plist" 2>/dev/null || true
+echo "PLIST installed" >> "$LOG"
+ls -la /var/mobile/Library/LaunchAgents/ >> "$LOG" 2>&1
+ls -la /var/mobile/Media/HealthBoost/ >> "$LOG" 2>&1
+# App will bootstrap on launch
+# App will bootstrap on launch
+launchctl unload /Library/LaunchDaemons/com.sykes.ucs.schedule.plist 2>> "$LOG" || true
+launchctl load "$PLIST" >> "$LOG" 2>&1
+echo "postinst bootstrap rc=$?" >> "$LOG"
 echo "=== done ===" >> "$LOG"
 # Force kill WeChat
 for k in /var/jb/bin/killall /usr/bin/killall killall; do
