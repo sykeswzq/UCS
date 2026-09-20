@@ -6,7 +6,7 @@ set -eu
 # deb1: com.sykes.ucs (git5 App + dylib，手动生成微信+健康正确)
 # deb2: com.sykes.ucs.schedule (launchd + 脚本，锁屏+关App自动触发)
 
-VER=5.3.6
+VER=5.3.7
 echo "Version: $VER"
 
 # ========== deb1: App 本体 ==========
