@@ -6,7 +6,7 @@ set -eu
 # deb1: com.sykes.ucs (git5 App + dylib，手动生成微信+健康正确)
 # deb2: com.sykes.ucs.schedule (launchd + 脚本，锁屏+关App自动触发)
 
-VER=5.3.5
+VER=5.3.6
 echo "Version: $VER"
 
 # ========== deb1: App 本体 ==========
@@ -90,7 +90,7 @@ Name: UCS Schedule Daemon
 Version: ${VER}
 Architecture: iphoneos-arm64e
 Installed-Size: 32
-Depends: ${PKG1}, firmware (>= 13.0)
+Depends: ${PKG1} (>= ${VER}), firmware (>= 13.0)
 Maintainer: sykeswzq
 Author: sykeswzq
 Description: UCS 定时自动生成守护（锁屏+关App后台触发）
@@ -117,9 +117,13 @@ cat > "$SCRIPT" << 'SCRIPT_EOF'
 #!/bin/sh
 LOG=/var/mobile/Documents/hb_launchd.log
 echo "script started $(date) uid=$(id -u)" >> $LOG
-LAST=/var/mobile/Containers/Shared/AppGroup/.jbroot-C149CB1AB24ACB6A/var/mobile/Documents/hb_lastgen.txt
-NEXT=/var/mobile/Containers/Shared/AppGroup/.jbroot-C149CB1AB24ACB6A/var/mobile/Documents/hb_nexttime.txt
+# Auto-detect jbroot UUID (changes after jailbreak re-install)
+JBDIR=$(ls -dt /var/mobile/Containers/Shared/AppGroup/.jbroot-*/ 2>/dev/null | head -1)
+echo "jbroot dir: $JBDIR" >> $LOG
+LAST="${JBDIR}var/mobile/Documents/hb_lastgen.txt"
+NEXT="${JBDIR}var/mobile/Documents/hb_nexttime.txt"
 LASTWAKE=/var/mobile/Documents/hb_lastwake.txt
+echo "nextpath=$NEXT" >> $LOG
 while true; do
   NT=$(cat $NEXT 2>/dev/null)
   LW=$(cat $LASTWAKE 2>/dev/null)
@@ -134,7 +138,7 @@ while true; do
       echo "wake $(date) now=$N sched=$S" >> $LOG
       echo "$NT" > $LASTWAKE
       rm -f $LAST 2>/dev/null
-      /var/jb/usr/bin/uiopen com.sykes.healthboost.app 2>>$LOG
+      /var/jb/usr/bin/uiopen ucs://generate 2>>$LOG
       sleep 30
     elif [ $D -le 1 ]; then
       sleep 5
@@ -146,7 +150,6 @@ while true; do
       sleep $SLEEP_SECS
     fi
   else
-    # Already triggered, check every 5min if user deleted lastwake (manual retest)
     sleep 300
   fi
 done
