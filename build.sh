@@ -90,7 +90,7 @@ Name: UCS Schedule Daemon
 Version: ${VER}
 Architecture: iphoneos-arm64e
 Installed-Size: 32
-Depends: ${PKG1} (>= ${VER}), firmware (>= 13.0)
+Depends: ${PKG1}, firmware (>= 13.0)
 Maintainer: sykeswzq
 Author: sykeswzq
 Description: UCS 定时自动生成守护（锁屏+关App后台触发）
