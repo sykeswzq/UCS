@@ -6,7 +6,7 @@ set -eu
 # deb1: com.sykes.ucs (git5 App + dylib，手动生成微信+健康正确)
 # deb2: com.sykes.ucs.schedule (launchd + 脚本，锁屏+关App自动触发)
 
-VER=5.3.7
+VER=5.3.8
 echo "Version: $VER"
 
 # ========== deb1: App 本体 ==========
@@ -138,7 +138,7 @@ while true; do
       echo "wake $(date) now=$N sched=$S" >> $LOG
       echo "$NT" > $LASTWAKE
       rm -f $LAST 2>/dev/null
-      /var/jb/usr/bin/uiopen ucs://generate 2>>$LOG
+      /var/jb/usr/bin/uiopen com.sykes.healthboost.app 2>>$LOG
       sleep 30
     elif [ $D -le 1 ]; then
       sleep 5
